@@ -1,0 +1,299 @@
+@import "tailwindcss";
+
+/* =========================================================
+   TV SUPREME DESIGN TOKENS
+========================================================= */
+
+:root {
+  --tv-pink: #ec008c;
+  --tv-magenta: #d5008f;
+  --tv-purple: #6a1b9a;
+  --tv-deep-purple: #4b168c;
+  --tv-blue: #263b91;
+
+  --tv-text: #111d4a;
+  --tv-heading: #101b4f;
+  --tv-muted: #69748c;
+
+  --tv-bg: #ffffff;
+  --tv-surface: #ffffff;
+  --tv-soft: #f7f8fc;
+  --tv-soft-purple: #f6f2ff;
+  --tv-soft-pink: #fff1f8;
+
+  --tv-border: #e3e7f0;
+  --tv-divider: #edf0f5;
+
+  --tv-shadow: 0 4px 18px rgba(17, 29, 74, 0.05);
+}
+
+html.dark {
+  --tv-text: #f4f6ff;
+  --tv-heading: #ffffff;
+  --tv-muted: #a9b1c7;
+
+  --tv-bg: #0d1122;
+  --tv-surface: #151a2d;
+  --tv-soft: #1c2238;
+  --tv-soft-purple: #242044;
+  --tv-soft-pink: #35172c;
+
+  --tv-border: #30374e;
+  --tv-divider: #282f45;
+
+  --tv-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+/* =========================================================
+   BASE
+========================================================= */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--tv-bg);
+  color: var(--tv-text);
+
+  font-family:
+    Arial,
+    Helvetica,
+    sans-serif;
+
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+/* =========================================================
+   FULL WIDTH CONTAINER
+========================================================= */
+
+/*
+  Desktop:
+  Uses almost the entire browser width.
+
+  Mobile:
+  Small side padding.
+
+  This matches your reference screenshot much better
+  than the previous max-width: 1240px container.
+*/
+
+.tv-container {
+  width: 100%;
+  margin-inline: auto;
+  padding-inline: 30px;
+}
+
+@media (min-width: 1600px) {
+  .tv-container {
+    padding-inline: 48px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .tv-container {
+    padding-inline: 22px;
+  }
+}
+
+@media (max-width: 640px) {
+  .tv-container {
+    padding-inline: 14px;
+  }
+}
+
+@media (max-width: 400px) {
+  .tv-container {
+    padding-inline: 10px;
+  }
+}
+
+/* =========================================================
+   COMMON STYLES
+========================================================= */
+
+.tv-section {
+  padding-block: 28px;
+}
+
+.tv-title {
+  color: var(--tv-heading);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.tv-card {
+  background: var(--tv-surface);
+  border: 1px solid var(--tv-border);
+  border-radius: 14px;
+  box-shadow: var(--tv-shadow);
+
+  transition:
+    background-color 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.tv-link {
+  color: var(--tv-pink);
+  font-weight: 700;
+}
+
+.tv-link:hover {
+  color: var(--tv-purple);
+}
+
+.tv-gradient {
+  background:
+    linear-gradient(
+      135deg,
+      var(--tv-pink) 0%,
+      var(--tv-magenta) 45%,
+      var(--tv-purple) 100%
+    );
+}
+
+.tv-gradient-text {
+  background:
+    linear-gradient(
+      135deg,
+      var(--tv-pink),
+      var(--tv-purple)
+    );
+
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* =========================================================
+   DARK MODE OVERRIDES
+========================================================= */
+
+.dark body {
+  background: var(--tv-bg);
+  color: var(--tv-text);
+}
+
+.dark .bg-white {
+  background-color: var(--tv-surface) !important;
+}
+
+.dark .bg-slate-50 {
+  background-color: var(--tv-soft) !important;
+}
+
+.dark .text-\[\#111d4a\] {
+  color: var(--tv-text) !important;
+}
+
+.dark .border-slate-200,
+.dark .border-slate-100 {
+  border-color: var(--tv-border) !important;
+}
+
+.dark .text-slate-400 {
+  color: var(--tv-muted) !important;
+}
+
+.dark .text-slate-500 {
+  color: var(--tv-muted) !important;
+}
+
+/* =========================================================
+   FORM CONTROLS
+========================================================= */
+
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: var(--tv-soft);
+  color: var(--tv-text);
+  border-color: var(--tv-border);
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: var(--tv-muted);
+}
+
+/* =========================================================
+   SCROLLBAR
+========================================================= */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--tv-soft);
+}
+
+::-webkit-scrollbar-thumb {
+  background:
+    linear-gradient(
+      180deg,
+      var(--tv-pink),
+      var(--tv-purple)
+    );
+
+  border-radius: 999px;
+}
+
+/* =========================================================
+   SELECTION
+========================================================= */
+
+::selection {
+  background: rgba(236, 0, 140, 0.2);
+  color: var(--tv-heading);
+}
+
+/* =========================================================
+   RESPONSIVE HELPERS
+========================================================= */
+
+@media (max-width: 768px) {
+  .tv-section {
+    padding-block: 22px;
+  }
+}
+
+@media (max-width: 480px) {
+  .tv-section {
+    padding-block: 18px;
+  }
+}

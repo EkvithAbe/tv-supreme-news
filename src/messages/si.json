@@ -1,0 +1,20 @@
+{
+  "Navigation": {
+    "home": "මුල් පිටුව",
+    "latest": "නවතම",
+    "sriLanka": "ශ්‍රී ලංකා",
+    "world": "ලෝකය",
+    "politics": "දේශපාලනය",
+    "business": "ව්‍යාපාර",
+    "sports": "ක්‍රීඩා",
+    "entertainment": "විනෝදාස්වාදය",
+    "technology": "තාක්ෂණය",
+    "lifestyle": "ජීවන රටාව",
+    "video": "වීඩියෝ",
+    "watchLive": "සජීවීව නරඹන්න"
+  },
+  "Common": {
+    "search": "සොයන්න",
+    "language": "භාෂාව"
+  }
+}

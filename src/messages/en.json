@@ -1,0 +1,20 @@
+{
+  "Navigation": {
+    "home": "Home",
+    "latest": "Latest",
+    "sriLanka": "Sri Lanka",
+    "world": "World",
+    "politics": "Politics",
+    "business": "Business",
+    "sports": "Sports",
+    "entertainment": "Entertainment",
+    "technology": "Technology",
+    "lifestyle": "Lifestyle",
+    "video": "Video",
+    "watchLive": "Watch Live"
+  },
+  "Common": {
+    "search": "Search",
+    "language": "Language"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "Navigation": {
+    "home": "முகப்பு",
+    "latest": "சமீபத்திய",
+    "sriLanka": "இலங்கை",
+    "world": "உலகம்",
+    "politics": "அரசியல்",
+    "business": "வணிகம்",
+    "sports": "விளையாட்டு",
+    "entertainment": "பொழுதுபோக்கு",
+    "technology": "தொழில்நுட்பம்",
+    "lifestyle": "வாழ்க்கை முறை",
+    "video": "வீடியோ",
+    "watchLive": "நேரலையில் பார்க்க"
+  },
+  "Common": {
+    "search": "தேடல்",
+    "language": "மொழி"
+  }
+}

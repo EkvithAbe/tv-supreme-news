@@ -1,0 +1,409 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/* =========================================================
+   ENUMS
+========================================================= */
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  JOURNALIST
+  VIDEO_EDITOR
+  PHOTOGRAPHER
+}
+
+enum ArticleStatus {
+  DRAFT
+  REVIEW
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum Language {
+  EN
+  SI
+  TA
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+}
+
+enum PageStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum HomepageSectionType {
+  HERO
+  FEATURED
+  LATEST
+  TRENDING
+  TOP_STORIES
+  VIDEOS
+  PROMO
+}
+
+enum VideoStatus {
+  DRAFT
+  REVIEW
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ContactMessageStatus {
+  NEW
+  READ
+  REPLIED
+  ARCHIVED
+}
+
+enum LiveStreamType {
+  HLS
+  MP4
+  EMBED
+  OTHER
+}
+
+/* =========================================================
+   USER
+========================================================= */
+
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  passwordHash String
+  role         UserRole   @default(JOURNALIST)
+
+  articles     Article[]
+
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+/* =========================================================
+   CATEGORY
+========================================================= */
+
+model Category {
+  id           String                @id @default(cuid())
+  slug         String                @unique
+
+  translations CategoryTranslation[]
+  articles     Article[]
+  videos       Video[]
+
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+}
+
+model CategoryTranslation {
+  id          String    @id @default(cuid())
+  categoryId  String
+  language    Language
+  name        String
+  description String?
+
+  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, language])
+}
+
+/* =========================================================
+   ARTICLE
+========================================================= */
+
+model Article {
+  id                String                @id @default(cuid())
+  slug              String                @unique
+
+  status            ArticleStatus         @default(DRAFT)
+
+  categoryId        String
+  authorId          String
+  mainImageId       String?
+
+  isBreaking        Boolean               @default(false)
+  isFeatured        Boolean               @default(false)
+  showOnHomepage    Boolean               @default(false)
+  showInLatest      Boolean               @default(true)
+
+  views             Int                   @default(0)
+
+  publishedAt       DateTime?
+  scheduledAt       DateTime?
+
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  category          Category              @relation(fields: [categoryId], references: [id])
+  author            User                  @relation(fields: [authorId], references: [id])
+  mainImage         Media?                @relation("ArticleMainImage", fields: [mainImageId], references: [id], onDelete: SetNull)
+
+  translations      ArticleTranslation[]
+  tags              ArticleTag[]
+  media             ArticleMedia[]
+  homepageSections  HomepageSection[]
+}
+
+/* =========================================================
+   ARTICLE TRANSLATION
+========================================================= */
+
+model ArticleTranslation {
+  id             String    @id @default(cuid())
+  articleId      String
+  language       Language
+
+  title          String
+  summary        String?
+  content        String
+
+  seoTitle       String?
+  seoDescription String?
+
+  article        Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, language])
+}
+
+/* =========================================================
+   TAG
+========================================================= */
+
+model Tag {
+  id        String       @id @default(cuid())
+  slug      String       @unique
+  name      String       @unique
+
+  articles  ArticleTag[]
+
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model ArticleTag {
+  articleId String
+  tagId     String
+
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, tagId])
+}
+
+/* =========================================================
+   MEDIA
+========================================================= */
+
+model Media {
+  id                String              @id @default(cuid())
+  filename          String
+  url               String
+  type              MediaType
+
+  mimeType          String?
+  size              Int?
+  width             Int?
+  height            Int?
+  altText           String?
+
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  mainArticles      Article[]           @relation("ArticleMainImage")
+  articleMedia      ArticleMedia[]
+  videoThumbnails   Video[]             @relation("VideoThumbnail")
+  homepageSections  HomepageSection[]
+}
+
+/* =========================================================
+   ARTICLE MEDIA
+========================================================= */
+
+model ArticleMedia {
+  articleId String
+  mediaId   String
+  sortOrder Int      @default(0)
+
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  media     Media    @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, mediaId])
+}
+
+/* =========================================================
+   VIDEO
+========================================================= */
+
+model Video {
+  id               String              @id @default(cuid())
+
+  slug             String              @unique
+  title            String
+  description      String?
+
+  language         Language            @default(EN)
+  status           VideoStatus         @default(DRAFT)
+
+  categoryId       String?
+
+  thumbnailId      String?
+  videoUrl         String
+
+  duration         Int?
+  views            Int                 @default(0)
+
+  isFeatured       Boolean             @default(false)
+
+  publishedAt      DateTime?
+  scheduledAt      DateTime?
+
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  category         Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  thumbnail        Media?              @relation("VideoThumbnail", fields: [thumbnailId], references: [id], onDelete: SetNull)
+  homepageSections HomepageSection[]
+}
+
+/* =========================================================
+   PAGE
+========================================================= */
+
+model Page {
+  id           String            @id @default(cuid())
+  slug         String            @unique
+
+  status       PageStatus        @default(DRAFT)
+
+  translations PageTranslation[]
+
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+model PageTranslation {
+  id             String   @id @default(cuid())
+  pageId         String
+  language       Language
+
+  title          String
+  content        String
+
+  seoTitle       String?
+  seoDescription String?
+
+  page           Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@unique([pageId, language])
+}
+
+/* =========================================================
+   HOMEPAGE
+========================================================= */
+
+model HomepageSection {
+  id         String               @id @default(cuid())
+
+  type       HomepageSectionType
+  title      String?
+  position   Int                  @default(0)
+
+  isEnabled  Boolean              @default(true)
+
+  articleId  String?
+  videoId    String?
+  mediaId    String?
+
+  article    Article?             @relation(fields: [articleId], references: [id], onDelete: SetNull)
+  video      Video?               @relation(fields: [videoId], references: [id], onDelete: SetNull)
+  media      Media?               @relation(fields: [mediaId], references: [id], onDelete: SetNull)
+
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+}
+
+/* =========================================================
+   MENU
+========================================================= */
+
+model MenuItem {
+  id         String    @id @default(cuid())
+
+  language   Language  @default(EN)
+
+  label      String
+  href       String
+
+  position   Int       @default(0)
+  isVisible  Boolean   @default(true)
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+/* =========================================================
+   LIVE TV
+========================================================= */
+
+model LiveStream {
+  id           String          @id @default(cuid())
+
+  channelName  String
+  streamUrl    String
+  streamType   LiveStreamType  @default(HLS)
+
+  isLive       Boolean         @default(false)
+  isEnabled    Boolean         @default(true)
+
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+/* =========================================================
+   CONTACT MESSAGES
+========================================================= */
+
+model ContactMessage {
+  id          String               @id @default(cuid())
+
+  name        String
+  email       String
+  phone       String?
+  subject     String
+  message     String
+
+  status      ContactMessageStatus @default(NEW)
+
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+}
+
+/* =========================================================
+   SETTINGS
+========================================================= */
+
+model SiteSetting {
+  id        String   @id @default(cuid())
+
+  key       String   @unique
+  value     String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

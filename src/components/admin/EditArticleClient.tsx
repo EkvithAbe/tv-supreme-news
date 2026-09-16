@@ -13,7 +13,6 @@ import {
   Save,
   Send,
   Settings2,
-  Tag,
   Video,
   X,
   Zap,
@@ -477,6 +476,7 @@ export default function EditArticleClient({
             isFeatured: featured,
             showOnHomepage,
             showInLatest,
+
             publishedAt:
               status === "PUBLISHED"
                 ? getPublishDateValue()
@@ -484,14 +484,15 @@ export default function EditArticleClient({
                     status === "REVIEW"
                   ? null
                   : undefined,
+
             scheduledAt:
               status === "SCHEDULED"
                 ? getPublishDateValue()
-                : status !== "SCHEDULED"
-                  ? null
-                  : undefined,
+                : null,
+
             translations:
               translationPayload,
+
             tags,
           }),
         },
@@ -722,7 +723,6 @@ export default function EditArticleClient({
               </div>
 
               <div className="space-y-6 p-4 sm:p-6">
-                {/* HEADLINE */}
                 <div>
                   <label
                     htmlFor="headline"
@@ -771,7 +771,6 @@ export default function EditArticleClient({
                   </div>
                 </div>
 
-                {/* SUMMARY */}
                 <div>
                   <label
                     htmlFor="summary"
@@ -798,7 +797,6 @@ export default function EditArticleClient({
                   />
                 </div>
 
-                {/* CONTENT */}
                 <div>
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <label
@@ -1263,7 +1261,7 @@ export default function EditArticleClient({
               </div>
             </section>
 
-            {/* OPTIONS */}
+            {/* ARTICLE OPTIONS */}
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-200 px-5 py-5">
                 <h2 className="text-lg font-semibold text-slate-900">

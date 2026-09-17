@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   Archive,
   CalendarClock,
@@ -54,6 +55,14 @@ const statusFilters = [
   { label: "Archived", value: "ARCHIVED" },
 ];
 
+const statusOptions = [
+  { label: "Draft", value: "DRAFT" },
+  { label: "Review", value: "REVIEW" },
+  { label: "Approved", value: "APPROVED" },
+  { label: "Published", value: "PUBLISHED" },
+  { label: "Archived", value: "ARCHIVED" },
+] as const;
+
 function formatDate(value: string | Date | null) {
   if (!value) {
     return "—";
@@ -76,16 +85,22 @@ function getStatusLabel(status: string) {
   switch (status) {
     case "DRAFT":
       return "Draft";
+
     case "REVIEW":
       return "Review";
+
     case "APPROVED":
       return "Approved";
+
     case "SCHEDULED":
       return "Scheduled";
+
     case "PUBLISHED":
       return "Published";
+
     case "ARCHIVED":
       return "Archived";
+
     default:
       return status;
   }
@@ -95,16 +110,22 @@ function getStatusClasses(status: string) {
   switch (status) {
     case "DRAFT":
       return "bg-slate-100 text-slate-600";
+
     case "REVIEW":
       return "bg-amber-50 text-amber-700";
+
     case "APPROVED":
       return "bg-blue-50 text-blue-700";
+
     case "SCHEDULED":
       return "bg-violet-50 text-violet-700";
+
     case "PUBLISHED":
       return "bg-emerald-50 text-emerald-700";
+
     case "ARCHIVED":
       return "bg-slate-100 text-slate-500";
+
     default:
       return "bg-slate-100 text-slate-600";
   }
@@ -113,11 +134,26 @@ function getStatusClasses(status: string) {
 export default function ArticlesClient({
   initialArticles,
 }: Props) {
-  const [articles] = useState<Article[]>(initialArticles);
-  const [activeStatus, setActiveStatus] = useState("all");
-  const [search, setSearch] = useState("");
+  const [articles, setArticles] =
+    useState<Article[]>(initialArticles);
+
+  const [activeStatus, setActiveStatus] =
+    useState("all");
+
+  const [search, setSearch] =
+    useState("");
+
   const [selectedCategory, setSelectedCategory] =
     useState("all");
+
+  const [openMenuId, setOpenMenuId] =
+    useState<string | null>(null);
+
+  const [actionLoadingId, setActionLoadingId] =
+    useState<string | null>(null);
+
+  const [actionError, setActionError] =
+    useState("");
 
   const categories = useMemo(() => {
     const map = new Map<string, string>();
@@ -142,20 +178,27 @@ export default function ArticlesClient({
   const stats = useMemo(() => {
     return {
       total: articles.length,
+
       drafts: articles.filter(
-        (article) => article.status === "DRAFT",
+        (article) =>
+          article.status === "DRAFT",
       ).length,
+
       review: articles.filter(
-        (article) => article.status === "REVIEW",
+        (article) =>
+          article.status === "REVIEW",
       ).length,
+
       published: articles.filter(
-        (article) => article.status === "PUBLISHED",
+        (article) =>
+          article.status === "PUBLISHED",
       ).length,
     };
   }, [articles]);
 
   const filteredArticles = useMemo(() => {
-    const searchText = search.trim().toLowerCase();
+    const searchText =
+      search.trim().toLowerCase();
 
     return articles.filter((article) => {
       const matchesStatus =
@@ -164,7 +207,8 @@ export default function ArticlesClient({
 
       const matchesCategory =
         selectedCategory === "all" ||
-        article.category?.id === selectedCategory;
+        article.category?.id ===
+          selectedCategory;
 
       const matchesSearch =
         !searchText ||
@@ -217,9 +261,135 @@ export default function ArticlesClient({
     },
   ];
 
+  const handleChangeStatus = async (
+    articleId: string,
+    status: string,
+  ) => {
+    setActionError("");
+    setActionLoadingId(articleId);
+
+    try {
+      const response = await fetch(
+        "/api/admin/articles",
+        {
+          method: "PATCH",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body: JSON.stringify({
+            id: articleId,
+            status,
+          }),
+        },
+      );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "Unable to change article status.",
+        );
+      }
+
+      setArticles((current) =>
+        current.map((article) =>
+          article.id === articleId
+            ? {
+                ...article,
+                status:
+                  data.article?.status ??
+                  status,
+                publishedAt:
+                  data.article
+                    ?.publishedAt ??
+                  article.publishedAt,
+              }
+            : article,
+        ),
+      );
+
+      setOpenMenuId(null);
+    } catch (error) {
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : "Unable to change article status.",
+      );
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleDelete = async (
+    articleId: string,
+    articleTitle: string,
+  ) => {
+    const confirmed =
+      window.confirm(
+        `Delete "${articleTitle}"?\n\nThis action cannot be undone.`,
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setActionError("");
+    setActionLoadingId(articleId);
+
+    try {
+      const response = await fetch(
+        "/api/admin/articles",
+        {
+          method: "DELETE",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body: JSON.stringify({
+            id: articleId,
+          }),
+        },
+      );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "Unable to delete article.",
+        );
+      }
+
+      setArticles((current) =>
+        current.filter(
+          (article) =>
+            article.id !== articleId,
+        ),
+      );
+
+      setOpenMenuId(null);
+    } catch (error) {
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : "Unable to delete article.",
+      );
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Page heading */}
+      {/* PAGE HEADER */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-sm font-medium text-pink-600">
@@ -231,21 +401,28 @@ export default function ArticlesClient({
           </h1>
 
           <p className="mt-1 text-sm text-slate-500">
-            Manage, edit and organize every article in
-            your newsroom.
+            Manage, edit and organize every
+            article in your newsroom.
           </p>
         </div>
 
-        <a
+        <Link
           href="/admin/news/new"
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
         >
           <Plus size={17} />
           New Article
-        </a>
+        </Link>
       </div>
 
-      {/* Stats */}
+      {/* ACTION ERROR */}
+      {actionError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {actionError}
+        </div>
+      )}
+
+      {/* STATS */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {statCards.map((stat) => {
           const Icon = stat.icon;
@@ -275,12 +452,12 @@ export default function ArticlesClient({
         })}
       </div>
 
-      {/* Main card */}
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        {/* Toolbar */}
+      {/* MAIN CARD */}
+      <section className="overflow-visible rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {/* TOOLBAR */}
         <div className="border-b border-slate-200 p-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            {/* Search */}
+            {/* SEARCH */}
             <div className="relative w-full xl:max-w-md">
               <Search
                 size={18}
@@ -291,14 +468,16 @@ export default function ArticlesClient({
                 type="search"
                 value={search}
                 onChange={(event) =>
-                  setSearch(event.target.value)
+                  setSearch(
+                    event.target.value,
+                  )
                 }
                 placeholder="Search articles..."
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-pink-400 focus:bg-white"
               />
             </div>
 
-            {/* Controls */}
+            {/* CONTROLS */}
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -310,7 +489,9 @@ export default function ArticlesClient({
 
               <div className="relative">
                 <select
-                  value={selectedCategory}
+                  value={
+                    selectedCategory
+                  }
                   onChange={(event) =>
                     setSelectedCategory(
                       event.target.value,
@@ -322,14 +503,18 @@ export default function ArticlesClient({
                     All Categories
                   </option>
 
-                  {categories.map((category) => (
-                    <option
-                      key={category.id}
-                      value={category.id}
-                    >
-                      {category.name}
-                    </option>
-                  ))}
+                  {categories.map(
+                    (category) => (
+                      <option
+                        key={category.id}
+                        value={
+                          category.id
+                        }
+                      >
+                        {category.name}
+                      </option>
+                    ),
+                  )}
                 </select>
 
                 <ChevronDown
@@ -348,18 +533,21 @@ export default function ArticlesClient({
             </div>
           </div>
 
-          {/* Status tabs */}
+          {/* STATUS TABS */}
           <div className="mt-5 flex gap-1 overflow-x-auto border-b border-slate-100">
             {statusFilters.map((filter) => {
               const active =
-                activeStatus === filter.value;
+                activeStatus ===
+                filter.value;
 
               return (
                 <button
                   key={filter.value}
                   type="button"
                   onClick={() =>
-                    setActiveStatus(filter.value)
+                    setActiveStatus(
+                      filter.value,
+                    )
                   }
                   className={`whitespace-nowrap border-b-2 px-4 py-3 text-sm font-semibold transition ${
                     active
@@ -374,7 +562,7 @@ export default function ArticlesClient({
           </div>
         </div>
 
-        {/* Table heading */}
+        {/* TABLE HEADER */}
         <div className="hidden grid-cols-[minmax(0,2.5fr)_150px_140px_120px_60px] gap-4 border-b border-slate-100 bg-slate-50 px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-400 md:grid">
           <span>Article</span>
           <span>Category</span>
@@ -383,75 +571,190 @@ export default function ArticlesClient({
           <span />
         </div>
 
-        {/* Articles */}
+        {/* ARTICLES */}
         {filteredArticles.length > 0 ? (
           <div className="divide-y divide-slate-100">
-            {filteredArticles.map((article) => (
-              <div
-                key={article.id}
-                className="grid gap-4 px-5 py-5 transition hover:bg-slate-50 md:grid-cols-[minmax(0,2.5fr)_150px_140px_120px_60px] md:items-center"
-              >
-                {/* Article */}
-                <div className="min-w-0">
-                  <div className="flex items-start gap-3">
-                    {article.isBreaking && (
-                      <span className="mt-1 rounded-full bg-red-50 px-2 py-1 text-[10px] font-bold uppercase text-red-600">
-                        Breaking
-                      </span>
-                    )}
+            {filteredArticles.map(
+              (article) => {
+                const menuOpen =
+                  openMenuId ===
+                  article.id;
 
+                const loading =
+                  actionLoadingId ===
+                  article.id;
+
+                return (
+                  <div
+                    key={article.id}
+                    className="grid gap-4 px-5 py-5 transition hover:bg-slate-50 md:grid-cols-[minmax(0,2.5fr)_150px_140px_120px_60px] md:items-center"
+                  >
+                    {/* ARTICLE */}
                     <div className="min-w-0">
-                      <h3 className="truncate text-sm font-semibold text-slate-900">
-                        {article.title}
-                      </h3>
+                      <div className="flex items-start gap-3">
+                        {article.isBreaking && (
+                          <span className="mt-1 rounded-full bg-red-50 px-2 py-1 text-[10px] font-bold uppercase text-red-600">
+                            Breaking
+                          </span>
+                        )}
 
-                      <p className="mt-1 truncate text-xs text-slate-400">
-                        {article.author?.name ??
-                          "Unknown author"}
-                        {" · "}
-                        {article.slug}
-                      </p>
+                        <div className="min-w-0">
+                          <h3 className="truncate text-sm font-semibold text-slate-900">
+                            {article.title}
+                          </h3>
+
+                          <p className="mt-1 truncate text-xs text-slate-400">
+                            {article.author
+                              ?.name ??
+                              "Unknown author"}
+                            {" · "}
+                            {article.slug}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* CATEGORY */}
+                    <div className="text-sm text-slate-600">
+                      {article.category
+                        ?.name ?? "—"}
+                    </div>
+
+                    {/* STATUS */}
+                    <div>
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusClasses(
+                          article.status,
+                        )}`}
+                      >
+                        {getStatusLabel(
+                          article.status,
+                        )}
+                      </span>
+                    </div>
+
+                    {/* PUBLISHED */}
+                    <div className="text-sm text-slate-500">
+                      {formatDate(
+                        article.publishedAt,
+                      )}
+                    </div>
+
+                    {/* ACTION MENU */}
+                    <div className="relative flex justify-start md:justify-end">
+                      <button
+                        type="button"
+                        title="Article actions"
+                        onClick={() => {
+                          setActionError("");
+
+                          setOpenMenuId(
+                            menuOpen
+                              ? null
+                              : article.id,
+                          );
+                        }}
+                        disabled={loading}
+                        className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <MoreHorizontal
+                          size={18}
+                        />
+                      </button>
+
+                      {menuOpen && (
+                        <div className="absolute right-0 top-10 z-50 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+                          {/* EDIT */}
+                          <Link
+                            href={`/admin/news/edit/${article.id}`}
+                            onClick={() =>
+                              setOpenMenuId(
+                                null,
+                              )
+                            }
+                            className="block px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                          >
+                            Edit Article
+                          </Link>
+
+                          {/* STATUS TITLE */}
+                          <div className="border-t border-slate-100 px-4 pb-1 pt-3">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                              Change Status
+                            </p>
+                          </div>
+
+                          {/* STATUS OPTIONS */}
+                          {statusOptions.map(
+                            (option) => {
+                              const isCurrent =
+                                article.status ===
+                                option.value;
+
+                              return (
+                                <button
+                                  key={
+                                    option.value
+                                  }
+                                  type="button"
+                                  disabled={
+                                    loading ||
+                                    isCurrent
+                                  }
+                                  onClick={() =>
+                                    handleChangeStatus(
+                                      article.id,
+                                      option.value,
+                                    )
+                                  }
+                                  className={`flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition ${
+                                    isCurrent
+                                      ? "cursor-default bg-slate-50 font-semibold text-slate-400"
+                                      : "font-medium text-slate-700 hover:bg-slate-50 hover:text-pink-600"
+                                  } disabled:opacity-60`}
+                                >
+                                  <span>
+                                    {
+                                      option.label
+                                    }
+                                  </span>
+
+                                  {isCurrent && (
+                                    <CheckCircle2
+                                      size={
+                                        15
+                                      }
+                                      className="text-pink-500"
+                                    />
+                                  )}
+                                </button>
+                              );
+                            },
+                          )}
+
+                          {/* DELETE */}
+                          <div className="border-t border-slate-100 pt-1">
+                            <button
+                              type="button"
+                              disabled={loading}
+                              onClick={() =>
+                                handleDelete(
+                                  article.id,
+                                  article.title,
+                                )
+                              }
+                              className="w-full px-4 py-2.5 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Delete Article
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
-
-                {/* Category */}
-                <div className="text-sm text-slate-600">
-                  {article.category?.name ?? "—"}
-                </div>
-
-                {/* Status */}
-                <div>
-                  <span
-                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusClasses(
-                      article.status,
-                    )}`}
-                  >
-                    {getStatusLabel(
-                      article.status,
-                    )}
-                  </span>
-                </div>
-
-                {/* Published */}
-                <div className="text-sm text-slate-500">
-                  {formatDate(
-                    article.publishedAt,
-                  )}
-                </div>
-
-                {/* Actions */}
-                <div className="flex justify-start md:justify-end">
-                  <button
-                    type="button"
-                    title="Article actions"
-                    className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                  >
-                    <MoreHorizontal size={18} />
-                  </button>
-                </div>
-              </div>
-            ))}
+                );
+              },
+            )}
           </div>
         ) : (
           <div className="flex min-h-[360px] flex-col items-center justify-center px-6 py-12 text-center">
@@ -475,24 +778,26 @@ export default function ArticlesClient({
             </p>
 
             {articles.length === 0 && (
-              <a
+              <Link
                 href="/admin/news/new"
                 className="mt-6 inline-flex items-center gap-2 rounded-xl bg-pink-50 px-4 py-2.5 text-sm font-semibold text-pink-600 transition hover:bg-pink-100"
               >
                 <Plus size={16} />
                 Create First Article
-              </a>
+              </Link>
             )}
           </div>
         )}
       </section>
 
-      {/* Bottom information */}
+      {/* BOTTOM INFORMATION */}
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="rounded-xl bg-amber-50 p-3 text-amber-600">
-              <CalendarClock size={19} />
+              <CalendarClock
+                size={19}
+              />
             </div>
 
             <div>
@@ -501,7 +806,8 @@ export default function ArticlesClient({
               </h3>
 
               <p className="mt-1 text-xs text-slate-400">
-                Articles ready for future publication
+                Articles ready for future
+                publication
               </p>
             </div>
           </div>
@@ -519,7 +825,8 @@ export default function ArticlesClient({
               </h3>
 
               <p className="mt-1 text-xs text-slate-400">
-                Important stories requiring priority
+                Important stories requiring
+                priority
               </p>
             </div>
           </div>
@@ -537,7 +844,8 @@ export default function ArticlesClient({
               </h3>
 
               <p className="mt-1 text-xs text-slate-400">
-                Older stories kept in the archive
+                Older stories kept in the
+                archive
               </p>
             </div>
           </div>

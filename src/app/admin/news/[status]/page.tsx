@@ -1,7 +1,5 @@
-"use client";
+import { notFound } from "next/navigation";
 
-import { useMemo } from "react";
-import { notFound, useParams } from "next/navigation";
 import {
   Archive,
   CalendarClock,
@@ -12,6 +10,11 @@ import {
   Zap,
 } from "lucide-react";
 
+import {
+  getArticles,
+  type ArticleStatusValue,
+} from "@/lib/data/articles";
+
 type NewsStatus =
   | "drafts"
   | "review"
@@ -19,15 +22,18 @@ type NewsStatus =
   | "published"
   | "archived";
 
+type StatusConfig = {
+  title: string;
+  description: string;
+  label: string;
+  icon: React.ElementType;
+  color: string;
+  databaseStatus: ArticleStatusValue;
+};
+
 const statusConfig: Record<
   NewsStatus,
-  {
-    title: string;
-    description: string;
-    label: string;
-    icon: React.ElementType;
-    color: string;
-  }
+  StatusConfig
 > = {
   drafts: {
     title: "Draft Articles",
@@ -36,7 +42,9 @@ const statusConfig: Record<
     label: "Draft",
     icon: FileText,
     color: "text-slate-600",
+    databaseStatus: "DRAFT",
   },
+
   review: {
     title: "Articles Under Review",
     description:
@@ -44,7 +52,9 @@ const statusConfig: Record<
     label: "Review",
     icon: ClipboardCheck,
     color: "text-amber-600",
+    databaseStatus: "REVIEW",
   },
+
   scheduled: {
     title: "Scheduled Articles",
     description:
@@ -52,7 +62,9 @@ const statusConfig: Record<
     label: "Scheduled",
     icon: CalendarClock,
     color: "text-purple-600",
+    databaseStatus: "SCHEDULED",
   },
+
   published: {
     title: "Published Articles",
     description:
@@ -60,7 +72,9 @@ const statusConfig: Record<
     label: "Published",
     icon: CheckCircle2,
     color: "text-emerald-600",
+    databaseStatus: "PUBLISHED",
   },
+
   archived: {
     title: "Archived Articles",
     description:
@@ -68,52 +82,63 @@ const statusConfig: Record<
     label: "Archived",
     icon: Archive,
     color: "text-slate-500",
+    databaseStatus: "ARCHIVED",
   },
 };
 
-const sampleArticles = [
-  {
-    id: 1,
-    title:
-      "President stresses unity for a stronger Sri Lanka",
-    category: "Sri Lanka",
-    author: "Administrator",
-    date: "14 Sep 2026",
-  },
-  {
-    id: 2,
-    title: "Port expansion to boost regional trade",
-    category: "Business",
-    author: "Administrator",
-    date: "13 Sep 2026",
-  },
-  {
-    id: 3,
-    title:
-      "Sri Lanka eye series win in final Test",
-    category: "Sports",
-    author: "Administrator",
-    date: "12 Sep 2026",
-  },
-];
+type PageProps = {
+  params: Promise<{
+    status: string;
+  }>;
+};
 
-export default function NewsStatusPage() {
-  const params = useParams();
+function formatDate(
+  value: Date | string | null | undefined,
+) {
+  if (!value) {
+    return "—";
+  }
 
-  const status = String(
-    params.status
-  ) as NewsStatus;
+  const date = new Date(value);
 
-  if (!statusConfig[status]) {
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return date.toLocaleDateString("en-LK", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+export default async function NewsStatusPage({
+  params,
+}: PageProps) {
+  const { status } = await params;
+
+  if (
+    !Object.prototype.hasOwnProperty.call(
+      statusConfig,
+      status,
+    )
+  ) {
     notFound();
   }
 
-  const config = statusConfig[status];
-  const Icon = config.icon;
+  const config =
+    statusConfig[status as NewsStatus];
 
-  const articles = useMemo(() => {
-    return sampleArticles;
-  }, []);
+  const result = await getArticles({
+    language: "EN",
+    status: config.databaseStatus,
+    page: 1,
+    pageSize: 100,
+  });
+
+  const articles = result.articles;
+
+  const Icon = config.icon;
 
   return (
     <div className="space-y-6">
@@ -125,7 +150,7 @@ export default function NewsStatusPage() {
           News Management
         </p>
 
-        <div className="mt-1 flex items-center gap-3">
+        <div className="mt-1 flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
             {config.title}
           </h1>
@@ -147,17 +172,21 @@ export default function NewsStatusPage() {
       ========================================================== */}
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-pink-50 text-pink-600">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-pink-50 text-pink-600">
             <Icon size={22} />
           </div>
 
-          <div>
+          <div className="min-w-0">
             <p className="text-sm font-semibold text-slate-800">
               {config.title}
             </p>
 
             <p className="mt-1 text-xs text-slate-400">
-              This screen will be connected to PostgreSQL later.
+              {articles.length}{" "}
+              {articles.length === 1
+                ? "article"
+                : "articles"}{" "}
+              currently in this status.
             </p>
           </div>
         </div>
@@ -169,7 +198,7 @@ export default function NewsStatusPage() {
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-pink-50 text-pink-600">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-pink-50 text-pink-600">
               <Newspaper size={18} />
             </div>
 
@@ -179,88 +208,129 @@ export default function NewsStatusPage() {
               </h2>
 
               <p className="text-sm text-slate-500">
-                Current {config.label.toLowerCase()} article
-                records.
+                Current{" "}
+                {config.label.toLowerCase()}{" "}
+                article records from PostgreSQL.
               </p>
             </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[800px]">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50 text-left">
-                <th className="px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-400">
-                  Article
-                </th>
+        {articles.length > 0 ? (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[800px]">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50 text-left">
+                    <th className="px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-400">
+                      Article
+                    </th>
 
-                <th className="px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-400">
-                  Category
-                </th>
+                    <th className="px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-400">
+                      Category
+                    </th>
 
-                <th className="px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-400">
-                  Author
-                </th>
+                    <th className="px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-400">
+                      Author
+                    </th>
 
-                <th className="px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-400">
-                  Date
-                </th>
+                    <th className="px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-400">
+                      Date
+                    </th>
 
-                <th className="px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-400">
-                  Status
-                </th>
-              </tr>
-            </thead>
+                    <th className="px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-400">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
 
-            <tbody>
-              {articles.map((article) => (
-                <tr
-                  key={article.id}
-                  className="border-b border-slate-100 transition hover:bg-slate-50/70"
-                >
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
-                        <FileText size={17} />
-                      </div>
+                <tbody>
+                  {articles.map((article) => {
+                    const date =
+                      article.status ===
+                      "SCHEDULED"
+                        ? article.scheduledAt ??
+                          article.createdAt
+                        : article.publishedAt ??
+                          article.createdAt;
 
-                      <div className="min-w-0">
-                        <p className="max-w-[380px] truncate text-sm font-semibold text-slate-800">
-                          {article.title}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
+                    return (
+                      <tr
+                        key={article.id}
+                        className="border-b border-slate-100 transition hover:bg-slate-50/70"
+                      >
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
+                              <FileText
+                                size={17}
+                              />
+                            </div>
 
-                  <td className="px-5 py-4 text-sm text-slate-600">
-                    {article.category}
-                  </td>
+                            <div className="min-w-0">
+                              <p className="max-w-[380px] truncate text-sm font-semibold text-slate-800">
+                                {article.title}
+                              </p>
 
-                  <td className="px-5 py-4 text-sm text-slate-600">
-                    {article.author}
-                  </td>
+                              <p className="mt-1 max-w-[420px] truncate text-xs text-slate-400">
+                                {article.slug}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
 
-                  <td className="px-5 py-4 text-sm text-slate-500">
-                    {article.date}
-                  </td>
+                        <td className="px-5 py-4 text-sm text-slate-600">
+                          {article.category
+                            ?.name ?? "—"}
+                        </td>
 
-                  <td className="px-5 py-4">
-                    <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                      {config.label}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                        <td className="px-5 py-4 text-sm text-slate-600">
+                          {article.author
+                            ?.name ?? "—"}
+                        </td>
 
-        <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-4">
-          <p className="text-xs text-slate-400">
-            Article data is currently sample UI data and will
-            later come from PostgreSQL.
-          </p>
-        </div>
+                        <td className="px-5 py-4 text-sm text-slate-500">
+                          {formatDate(date)}
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${config.color} bg-slate-100`}
+                          >
+                            {config.label}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-4">
+              <p className="text-xs text-slate-400">
+                These articles are loaded directly
+                from PostgreSQL.
+              </p>
+            </div>
+          </>
+        ) : (
+          <div className="flex min-h-[300px] flex-col items-center justify-center px-6 py-12 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-50 text-slate-300">
+              <FileText size={28} />
+            </div>
+
+            <h3 className="mt-5 text-lg font-semibold text-slate-700">
+              No {config.label.toLowerCase()}{" "}
+              articles
+            </h3>
+
+            <p className="mt-2 max-w-md text-sm leading-6 text-slate-400">
+              There are currently no articles with
+              this status in PostgreSQL.
+            </p>
+          </div>
+        )}
       </section>
 
       {/* =========================================================
@@ -278,9 +348,10 @@ export default function NewsStatusPage() {
             </h3>
 
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              These status pages use the same common structure.
-              Later, the status will determine which Article
-              records are loaded from PostgreSQL.
+              This page now uses the article status
+              stored in PostgreSQL. Creating or
+              changing an article status will update
+              the corresponding status page.
             </p>
           </div>
         </div>

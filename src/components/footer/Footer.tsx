@@ -1,8 +1,20 @@
 "use client";
 
-import { ArrowUp, Music2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import {
+  ArrowUp,
+  MapPin,
+  Music2,
+  Phone,
+} from "lucide-react";
+
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
 import { Link } from "@/i18n/navigation";
+import { usePathname } from "next/navigation";
 
 /* =========================================================
    TYPES
@@ -10,131 +22,195 @@ import { Link } from "@/i18n/navigation";
 
 type Locale = "en" | "si" | "ta";
 
-type SupportedLanguage = "EN" | "SI" | "TA";
+type SupportedLanguage =
+  | "EN"
+  | "SI"
+  | "TA";
 
-type FooterSiteConfig = {
+type FooterSocial = {
+  facebook: string;
+  youtube: string;
+  instagram: string;
+  tiktok: string;
+};
+
+type FooterLink = {
+  id: string;
+  label: string;
+  href: string;
+  position: number;
+  openNewTab: boolean;
+};
+
+type FooterData = {
+  language: SupportedLanguage;
+
   logoUrl: string;
   tagline: string;
-  social: {
-    facebook: string;
-    youtube: string;
-    instagram: string;
-    tiktok: string;
-  };
+  description: string;
+
+  telephone: string;
+  address: string;
+  mapUrl: string;
+
+  copyrightText: string;
+
+  social: FooterSocial;
+
+  links: FooterLink[];
 };
 
 type FooterApiResponse = {
   success: boolean;
-  language: SupportedLanguage;
-  menu?: unknown[];
-  site?: FooterSiteConfig;
+  language?: SupportedLanguage;
+  footer?: FooterData;
+  message?: string;
 };
 
 /* =========================================================
-   FALLBACK CONFIG
+   FALLBACK
 ========================================================= */
 
-const fallbackConfig: FooterSiteConfig = {
+const fallbackFooter: FooterData = {
+  language: "EN",
+
   logoUrl: "/logo.png",
-  tagline: "NEWS • PEOPLE • A BRIGHTER TOMORROW",
+
+  tagline:
+    "NEWS • PEOPLE • A BRIGHTER TOMORROW",
+
+  description: "",
+
+  telephone: "",
+
+  address: "",
+
+  mapUrl: "",
+
+  copyrightText: "",
+
   social: {
     facebook: "",
     youtube: "",
     instagram: "",
     tiktok: "",
   },
+
+  links: [],
 };
 
 /* =========================================================
-   FOOTER LINKS
+   LOCALE
 ========================================================= */
 
-const footerLinks = [
-  {
-    name: "About Us",
-    href: "/about",
-  },
-  {
-    name: "Contact Us",
-    href: "/contact",
-  },
-  {
-    name: "Advertise",
-    href: "/advertise",
-  },
-  {
-    name: "Privacy Policy",
-    href: "/legal/privacy-policy",
-  },
-  {
-    name: "Terms of Use",
-    href: "/legal/terms-of-use",
-  },
-];
+function getLocaleFromPath(
+  pathname: string,
+): Locale {
+  const match =
+    pathname.match(
+      /^\/(en|si|ta)(?=\/|$)/,
+    );
 
-/* =========================================================
-   LOCALE HELPER
-========================================================= */
-
-function getLocaleFromPath(pathname: string): Locale {
-  const match = pathname.match(/^\/(en|si|ta)(?=\/|$)/);
-
-  if (match?.[1] === "si") {
+  if (
+    match?.[1] === "si"
+  ) {
     return "si";
   }
 
-  if (match?.[1] === "ta") {
+  if (
+    match?.[1] === "ta"
+  ) {
     return "ta";
   }
 
   return "en";
 }
 
+function getLanguageFromLocale(
+  locale: Locale,
+): SupportedLanguage {
+  if (locale === "si") {
+    return "SI";
+  }
+
+  if (locale === "ta") {
+    return "TA";
+  }
+
+  return "EN";
+}
+
 /* =========================================================
-   SOCIAL ICON
-   Small inline SVG/text marks keep the footer lightweight
-   while matching the compact reference design.
+   URL HELPERS
+========================================================= */
+
+function isExternalUrl(
+  href: string,
+): boolean {
+  return /^https?:\/\//i.test(
+    href.trim(),
+  );
+}
+
+/* =========================================================
+   SOCIAL MARK
 ========================================================= */
 
 function SocialMark({
   type,
 }: {
-  type: "facebook" | "youtube" | "instagram" | "tiktok";
+  type:
+    | "facebook"
+    | "youtube"
+    | "instagram"
+    | "tiktok";
 }) {
-  if (type === "facebook") {
+  if (
+    type === "facebook"
+  ) {
     return (
       <span
         aria-hidden="true"
-        className="text-[16px] font-black leading-none"
+        className="text-[18px] font-black leading-none"
       >
         f
       </span>
     );
   }
 
-  if (type === "youtube") {
+  if (
+    type === "youtube"
+  ) {
     return (
       <span
         aria-hidden="true"
-        className="flex items-center justify-center text-[11px] leading-none"
+        className="text-[11px] font-bold leading-none"
       >
         ▶
       </span>
     );
   }
 
-  if (type === "instagram") {
+  if (
+    type === "instagram"
+  ) {
     return (
       <span
         aria-hidden="true"
-        className="text-[17px] font-bold leading-none"
+        className="text-[18px] font-bold leading-none"
       >
         ◎
       </span>
     );
   }
 
-  return <Music2 aria-hidden="true" size={15} strokeWidth={2.2} />;
+  return (
+    <Music2
+      aria-hidden="true"
+      size={17}
+      strokeWidth={2.2}
+    />
+  );
 }
 
 /* =========================================================
@@ -142,153 +218,311 @@ function SocialMark({
 ========================================================= */
 
 export default function Footer() {
-  const [currentYear, setCurrentYear] = useState(
-    new Date().getFullYear()
-  );
+  const pathname =
+    usePathname() || "/";
 
-  const [siteConfig, setSiteConfig] =
-    useState<FooterSiteConfig>(fallbackConfig);
+  const locale =
+    getLocaleFromPath(
+      pathname,
+    );
+
+  const language =
+    getLanguageFromLocale(
+      locale,
+    );
 
   /* =======================================================
-     LOAD SITE CONFIG
+     STATE
+  ======================================================== */
+
+  const [
+    footer,
+    setFooter,
+  ] = useState<FooterData>(
+    fallbackFooter,
+  );
+
+  const [
+    isLoading,
+    setIsLoading,
+  ] = useState(true);
+
+  const [
+    currentYear,
+    setCurrentYear,
+  ] = useState(
+    new Date().getFullYear(),
+  );
+
+  /* =======================================================
+     LOAD FOOTER FROM PUBLIC API
   ======================================================== */
 
   useEffect(() => {
-    const controller = new AbortController();
+    const controller =
+      new AbortController();
 
-    async function loadFooterConfig() {
+    async function loadFooter() {
       try {
-        const pathname = window.location.pathname;
-        const locale = getLocaleFromPath(pathname);
+        setIsLoading(true);
 
-        const language: SupportedLanguage =
-          locale === "si"
-            ? "SI"
-            : locale === "ta"
-              ? "TA"
-              : "EN";
+        /*
+         * Add a timestamp so the browser doesn't
+         * accidentally reuse an old response while
+         * working in development.
+         */
+        const response =
+          await fetch(
+            `/api/public/footer?language=${language}&_=${Date.now()}`,
+            {
+              method: "GET",
+              cache: "no-store",
 
-        const response = await fetch(
-          `/api/public/header?language=${language}`,
-          {
-            method: "GET",
-            cache: "no-store",
-            signal: controller.signal,
-          }
-        );
+              headers: {
+                "Cache-Control":
+                  "no-cache",
+              },
+
+              signal:
+                controller.signal,
+            },
+          );
 
         if (!response.ok) {
           throw new Error(
-            "Failed to load site configuration."
+            `Footer API returned ${response.status}`,
           );
         }
 
         const data =
           (await response.json()) as FooterApiResponse;
 
-        if (data.success && data.site) {
-          setSiteConfig({
-            logoUrl:
-              data.site.logoUrl ||
-              fallbackConfig.logoUrl,
-
-            tagline:
-              data.site.tagline ||
-              fallbackConfig.tagline,
-
-            social: {
-              facebook:
-                data.site.social?.facebook || "",
-
-              youtube:
-                data.site.social?.youtube || "",
-
-              instagram:
-                data.site.social?.instagram || "",
-
-              tiktok:
-                data.site.social?.tiktok || "",
-            },
-          });
+        if (
+          !data.success ||
+          !data.footer
+        ) {
+          throw new Error(
+            data.message ||
+              "Invalid footer API response.",
+          );
         }
+
+        /*
+         * Normalize the returned data.
+         */
+        setFooter({
+          language:
+            data.language ||
+            language,
+
+          logoUrl:
+            data.footer.logoUrl ||
+            fallbackFooter.logoUrl,
+
+          tagline:
+            data.footer.tagline ||
+            "",
+
+          description:
+            data.footer.description ||
+            "",
+
+          telephone:
+            data.footer.telephone ||
+            "",
+
+          address:
+            data.footer.address ||
+            "",
+
+          mapUrl:
+            data.footer.mapUrl ||
+            "",
+
+          copyrightText:
+            data.footer
+              .copyrightText ||
+            "",
+
+          social: {
+            facebook:
+              data.footer.social
+                ?.facebook ||
+              "",
+
+            youtube:
+              data.footer.social
+                ?.youtube ||
+              "",
+
+            instagram:
+              data.footer.social
+                ?.instagram ||
+              "",
+
+            tiktok:
+              data.footer.social
+                ?.tiktok ||
+              "",
+          },
+
+          links:
+            Array.isArray(
+              data.footer.links,
+            )
+              ? [
+                  ...data.footer.links,
+                ].sort(
+                  (a, b) =>
+                    a.position -
+                    b.position,
+                )
+              : [],
+        });
       } catch (error) {
         if (
-          error instanceof DOMException &&
-          error.name === "AbortError"
+          error instanceof
+            DOMException &&
+          error.name ===
+            "AbortError"
         ) {
           return;
         }
 
         console.error(
-          "Failed to load footer configuration:",
-          error
+          "Failed to load public footer:",
+          error,
         );
+
+        /*
+         * Keep the current footer instead of
+         * replacing it with a hard-coded menu.
+         */
+      } finally {
+        if (
+          !controller.signal
+            .aborted
+        ) {
+          setIsLoading(false);
+        }
       }
     }
 
-    loadFooterConfig();
+    void loadFooter();
 
     return () => {
       controller.abort();
     };
-  }, []);
+  }, [language]);
 
   /* =======================================================
      YEAR
   ======================================================== */
 
   useEffect(() => {
-    setCurrentYear(new Date().getFullYear());
+    setCurrentYear(
+      new Date().getFullYear(),
+    );
   }, []);
-
-  /* =======================================================
-     BACK TO TOP
-  ======================================================== */
-
-  const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
-  };
 
   /* =======================================================
      SOCIAL LINKS
   ======================================================== */
 
-  const socialLinks = [
-    {
-      name: "Facebook",
-      href: siteConfig.social.facebook,
-      type: "facebook" as const,
-      iconClass:
-        "bg-[#1877F2] text-white",
-    },
-    {
-      name: "YouTube",
-      href: siteConfig.social.youtube,
-      type: "youtube" as const,
-      iconClass:
-        "bg-[#FF0000] text-white",
-    },
-    {
-      name: "Instagram",
-      href: siteConfig.social.instagram,
-      type: "instagram" as const,
-      iconClass:
-        "bg-gradient-to-br from-[#f58529] via-[#dd2a7b] to-[#8134af] text-white",
-    },
-    {
-      name: "TikTok",
-      href: siteConfig.social.tiktok,
-      type: "tiktok" as const,
-      iconClass:
-        "bg-[#111827] text-white",
-    },
-  ];
+  const socialLinks =
+    useMemo(() => {
+      return [
+        {
+          name: "Facebook",
+          href:
+            footer.social
+              .facebook,
 
-  const visibleSocialLinks =
-    socialLinks.filter((social) => Boolean(social.href));
+          type:
+            "facebook" as const,
+        },
+
+        {
+          name: "YouTube",
+          href:
+            footer.social
+              .youtube,
+
+          type:
+            "youtube" as const,
+        },
+
+        {
+          name: "Instagram",
+          href:
+            footer.social
+              .instagram,
+
+          type:
+            "instagram" as const,
+        },
+
+        {
+          name: "TikTok",
+          href:
+            footer.social
+              .tiktok,
+
+          type:
+            "tiktok" as const,
+        },
+      ].filter(
+        (item) =>
+          Boolean(
+            item.href,
+          ),
+      );
+    }, [
+      footer.social,
+    ]);
+
+  /* =======================================================
+     FOOTER LINKS
+  ======================================================== */
+
+  const visibleLinks =
+    useMemo(() => {
+      return [
+        ...footer.links,
+      ]
+        .filter(
+          (link) =>
+            Boolean(
+              link.label?.trim(),
+            ) &&
+            Boolean(
+              link.href?.trim(),
+            ),
+        )
+        .sort(
+          (a, b) =>
+            a.position -
+            b.position,
+        );
+    }, [
+      footer.links,
+    ]);
+
+  /* =======================================================
+     BACK TO TOP
+  ======================================================== */
+
+  const scrollToTop =
+    () => {
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
+    };
+
+  /* =======================================================
+     RENDER
+  ======================================================== */
 
   return (
     <footer
@@ -302,29 +536,55 @@ export default function Footer() {
         dark:bg-[#151a2d]
       "
     >
+
       {/* =====================================================
-          FOOTER CONTENT
+          MAIN FOOTER
       ====================================================== */}
 
-      <div className="w-full px-6 pb-6 pt-7 sm:px-8 lg:px-16 xl:px-20">
+      <div
+        className="
+          w-full
+          px-6
+          pb-7
+          pt-8
+          sm:px-8
+          md:px-10
+          lg:px-12
+          xl:px-16
+          2xl:px-20
+        "
+      >
+
+        {/* NO max-width HERE.
+            This intentionally uses the full viewport width. */}
+
         <div
           className="
-            mx-auto
             flex
             w-full
             flex-col
-            gap-5
-            lg:flex-row
-            lg:items-center
-            lg:justify-between
-            lg:gap-8
+            gap-8
+            xl:flex-row
+            xl:items-center
+            xl:justify-between
+            xl:gap-10
           "
         >
+
           {/* =================================================
               BRAND
           ================================================== */}
 
-          <div className="flex min-w-0 items-center gap-3">
+          <div
+            className="
+              flex
+              min-w-0
+              shrink-0
+              items-center
+              gap-4
+            "
+          >
+
             <Link
               href="/"
               aria-label="TV Supreme Home"
@@ -334,59 +594,71 @@ export default function Footer() {
                 hover:opacity-85
               "
             >
+
               <img
                 src={
-                  siteConfig.logoUrl ||
+                  footer.logoUrl ||
                   "/logo.png"
                 }
                 alt="TV Supreme"
                 className="
-                  h-12
+                  h-14
                   w-auto
-                  max-w-[140px]
+                  max-w-[180px]
                   object-contain
-                  sm:h-13
-                  sm:max-w-[150px]
-                  lg:h-14
-                  lg:max-w-[160px]
+                  sm:h-16
+                  sm:max-w-[200px]
                 "
               />
+
             </Link>
 
-            <div className="min-w-0">
+            <div
+              className="
+                min-w-0
+                hidden
+                lg:block
+              "
+            >
+
               <Link
                 href="/"
                 className="
                   block
-                  text-[20px]
+                  text-[21px]
                   font-extrabold
                   tracking-tight
                   text-[#5F19C8]
                   transition
                   hover:text-[#ec008c]
-                  sm:text-[21px]
-                  lg:text-[22px]
+                  sm:text-[22px]
+                  xl:text-[24px]
                 "
               >
                 TV SUPREME
               </Link>
 
-              <p
-                className="
-    mt-0.5
-    whitespace-nowrap
-    text-[12px]
-    font-medium
-    leading-4
-    text-slate-400
-    sm:text-[13px]
-    lg:text-[14px]
-  "
-              >
-                {siteConfig.tagline ||
-                  "NEWS • PEOPLE • A BRIGHTER TOMORROW"}
-              </p>
+              {footer.tagline && (
+                <p
+                  className="
+                    mt-1
+                    whitespace-nowrap
+                    text-[13px]
+                    font-medium
+                    leading-5
+                    text-slate-400
+                    sm:text-[14px]
+                    xl:text-[15px]
+                  "
+                >
+                  {
+                    footer.tagline
+                  }
+                </p>
+              )}
+
             </div>
+
           </div>
 
           {/* =================================================
@@ -397,98 +669,182 @@ export default function Footer() {
             aria-label="Footer navigation"
             className="
               flex
+              min-w-0
+              flex-1
               flex-wrap
               items-center
-              justify-center
+              justify-start
               gap-x-4
-              gap-y-2
-              lg:flex-1
+              gap-y-3
+              xl:justify-center
             "
           >
-            {footerLinks.map(
-              (link, index) => (
-                <div
-                  key={link.name}
-                  className="flex items-center gap-2.5"
-                >
-                  <Link
-                    href={link.href}
+
+            {isLoading ? (
+              <span className="text-sm text-slate-400">
+                Loading...
+              </span>
+            ) : visibleLinks.length >
+              0 ? (
+              visibleLinks.map(
+                (
+                  link,
+                  index,
+                ) => (
+                  <div
+                    key={
+                      link.id
+                    }
                     className="
-                      whitespace-nowrap
-                      text-[14px]
-                      font-semibold
-                      text-slate-500
-                      transition
-                      hover:text-[#ec008c]
-                      sm:text-[15px]
-                      lg:text-[16px]
+                      flex
+                      items-center
+                      gap-4
                     "
                   >
-                    {link.name}
-                  </Link>
 
-                  {index <
-                    footerLinks.length - 1 && (
+                    {isExternalUrl(
+                      link.href,
+                    ) ? (
+                      <a
+                        href={
+                          link.href
+                        }
+                        target={
+                          link.openNewTab
+                            ? "_blank"
+                            : undefined
+                        }
+                        rel={
+                          link.openNewTab
+                            ? "noopener noreferrer"
+                            : undefined
+                        }
+                        className="
+                          whitespace-nowrap
+                          text-[15px]
+                          font-semibold
+                          text-slate-600
+                          transition
+                          hover:text-[#ec008c]
+                          sm:text-[16px]
+                        "
+                      >
+                        {
+                          link.label
+                        }
+                      </a>
+                    ) : (
+                      <Link
+                        href={
+                          link.href
+                        }
+                        className="
+                          whitespace-nowrap
+                          text-[15px]
+                          font-semibold
+                          text-slate-600
+                          transition
+                          hover:text-[#ec008c]
+                          sm:text-[16px]
+                          dark:text-slate-300
+                          dark:hover:text-[#ec008c]
+                        "
+                      >
+                        {
+                          link.label
+                        }
+                      </Link>
+                    )}
+
+                    {index <
+                      visibleLinks.length -
+                        1 && (
                       <span
                         aria-hidden="true"
                         className="
-                        text-[14px]
-                        font-medium
-                        text-slate-300
-                        dark:text-slate-600
-                      "
+                          text-[16px]
+                          font-medium
+                          text-slate-300
+                          dark:text-slate-600
+                        "
                       >
                         |
                       </span>
                     )}
-                </div>
+
+                  </div>
+                ),
               )
+            ) : (
+              <span className="text-sm text-slate-400">
+                No footer links configured.
+              </span>
             )}
+
           </nav>
 
           {/* =================================================
               SOCIAL
           ================================================== */}
 
-          <div className="flex shrink-0 items-center justify-center gap-3">
-            <span
-              className="
-                mr-1
-                whitespace-nowrap
-                text-[14px]
-                font-bold
-                text-[#111d4a]
-                sm:text-[15px]
-                lg:text-[16px]
-                dark:text-white
-              "
-            >
-              Follow Us
-            </span>
+          <div
+            className="
+              flex
+              shrink-0
+              items-center
+              justify-start
+              gap-3
+              xl:justify-end
+            "
+          >
 
-            {visibleSocialLinks.map(
+            {socialLinks.length >
+              0 && (
+              <span
+                className="
+                  mr-1
+                  whitespace-nowrap
+                  text-[15px]
+                  font-bold
+                  text-[#111d4a]
+                  sm:text-[16px]
+                  dark:text-white
+                "
+              >
+                Follow Us
+              </span>
+            )}
+
+            {socialLinks.map(
               (social) => (
                 <a
-                  key={social.name}
-                  href={social.href}
+                  key={
+                    social.name
+                  }
+                  href={
+                    social.href
+                  }
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label={social.name}
-                  title={social.name}
+                  aria-label={
+                    social.name
+                  }
+                  title={
+                    social.name
+                  }
                   className="
                     flex
-                    h-5
-                    w-5
+                    h-8
+                    w-8
                     items-center
                     justify-center
                     rounded-full
                     transition
                     hover:scale-110
                     hover:opacity-85
-                    sm:h-[22px]
-                    sm:w-[22px]
                   "
                 >
+
                   <span
                     className={`
                       flex
@@ -497,19 +853,152 @@ export default function Footer() {
                       items-center
                       justify-center
                       rounded-full
-                      ${social.iconClass}
+                      ${
+                        social.type ===
+                        "facebook"
+                          ? "bg-[#1877F2] text-white"
+                          : social.type ===
+                              "youtube"
+                            ? "bg-[#FF0000] text-white"
+                            : social.type ===
+                                "instagram"
+                              ? "bg-gradient-to-br from-[#f58529] via-[#dd2a7b] to-[#8134af] text-white"
+                              : "bg-[#111827] text-white"
+                      }
                     `}
                   >
+
                     <SocialMark
-                      type={social.type}
+                      type={
+                        social.type
+                      }
                     />
+
                   </span>
+
                 </a>
-              )
+              ),
             )}
 
           </div>
+
         </div>
+
+        {/* ===================================================
+            CONTACT INFORMATION
+        ==================================================== */}
+
+        {(footer.telephone ||
+          footer.address) && (
+          <div
+            className="
+              mt-7
+              flex
+              w-full
+              flex-col
+              items-start
+              justify-center
+              gap-4
+              border-t
+              border-slate-100
+              pt-5
+              sm:flex-row
+              sm:flex-wrap
+              sm:items-center
+              sm:gap-5
+              dark:border-[#30374e]
+            "
+          >
+
+            {/* PHONE */}
+
+            {footer.telephone && (
+              <a
+                href={`tel:${footer.telephone.replace(
+                  /[^\d+]/g,
+                  "",
+                )}`}
+                className="
+                  inline-flex
+                  items-center
+                  gap-2
+                  text-sm
+                  font-medium
+                  text-slate-500
+                  transition
+                  hover:text-[#ec008c]
+                  dark:text-slate-400
+                "
+              >
+                <Phone
+                  size={16}
+                />
+
+                <span>
+                  {
+                    footer.telephone
+                  }
+                </span>
+              </a>
+            )}
+
+            {/* SEPARATOR */}
+
+            {footer.telephone &&
+              footer.address && (
+              <span className="hidden text-slate-300 sm:inline dark:text-slate-600">
+                |
+              </span>
+            )}
+
+            {/* ADDRESS */}
+
+            {footer.address && (
+              <a
+                href={
+                  footer.mapUrl ||
+                  undefined
+                }
+                target={
+                  footer.mapUrl
+                    ? "_blank"
+                    : undefined
+                }
+                rel={
+                  footer.mapUrl
+                    ? "noopener noreferrer"
+                    : undefined
+                }
+                className="
+                  inline-flex
+                  items-start
+                  gap-2
+                  text-sm
+                  font-medium
+                  text-slate-500
+                  transition
+                  hover:text-[#ec008c]
+                  dark:text-slate-400
+                "
+              >
+
+                <MapPin
+                  size={16}
+                  className="mt-0.5 shrink-0"
+                />
+
+                <span>
+                  {
+                    footer.address
+                  }
+                </span>
+
+              </a>
+            )}
+
+          </div>
+        )}
+
       </div>
 
       {/* =====================================================
@@ -518,30 +1007,33 @@ export default function Footer() {
 
       <div
         className="
+          w-full
           border-t
           border-slate-100
-          bg-white
+          bg-slate-50
           dark:border-[#30374e]
           dark:bg-[#111628]
         "
       >
+
         <div
           className="
-            mx-auto
             flex
             w-full
             flex-col
-            gap-2
+            gap-3
             px-6
-            py-4
+            py-5
             sm:px-8
             md:flex-row
             md:items-center
             md:justify-between
-            lg:px-16
-            xl:px-20
+            lg:px-12
+            xl:px-16
+            2xl:px-20
           "
         >
+
           {/* COPYRIGHT */}
 
           <p
@@ -553,16 +1045,14 @@ export default function Footer() {
               lg:text-[15px]
             "
           >
-            © {currentYear} TV SUPREME. All Rights Reserved.
+            {footer.copyrightText ||
+              `© ${currentYear} TV SUPREME. All Rights Reserved.`}
           </p>
 
-          {/* DESIGNED FOR */}
+          {/* CENTER MESSAGE */}
 
-          <div
+          <p
             className="
-              flex
-              items-center
-              gap-2
               text-[13px]
               font-medium
               text-slate-400
@@ -570,33 +1060,74 @@ export default function Footer() {
               lg:text-[15px]
             "
           >
-            <span>
-              Designed for a More Informed Sri Lanka
-            </span>
+            Designed for a More
+            Informed Sri Lanka
+          </p>
 
-            <span
-              aria-hidden="true"
-              className="
-                h-[2px]
-                w-3
-                rounded-full
-                bg-[#ec008c]
-                sm:w-5
-              "
-            />
+          {/* LEGAL */}
 
-            <span
-              aria-hidden="true"
-              className="
-                h-[2px]
-                w-4
-                rounded-full
-                bg-[#6a1b9a]
-                sm:w-7
-              "
-            />
+          <div
+            className="
+              flex
+              flex-wrap
+              items-center
+              gap-3
+              text-[13px]
+              font-semibold
+              sm:text-[14px]
+              lg:text-[15px]
+            "
+          >
+
+            {visibleLinks.some(
+              (link) =>
+                link.href.includes(
+                  "/legal/privacy-policy",
+                ),
+            ) && (
+              <Link
+                href="/legal/privacy-policy"
+                className="text-slate-500 transition hover:text-[#ec008c] dark:text-slate-400"
+              >
+                Privacy Policy
+              </Link>
+            )}
+
+            {visibleLinks.some(
+              (link) =>
+                link.href.includes(
+                  "/legal/privacy-policy",
+                ),
+            ) &&
+              visibleLinks.some(
+                (link) =>
+                  link.href.includes(
+                    "/legal/terms-of-use",
+                  ),
+              ) && (
+                <span className="text-slate-300 dark:text-slate-600">
+                  |
+                </span>
+              )}
+
+            {visibleLinks.some(
+              (link) =>
+                link.href.includes(
+                  "/legal/terms-of-use",
+                ),
+            ) && (
+              <Link
+                href="/legal/terms-of-use"
+                className="text-slate-500 transition hover:text-[#ec008c] dark:text-slate-400"
+              >
+                Terms of Use
+              </Link>
+            )}
+
           </div>
+
         </div>
+
       </div>
 
       {/* =====================================================
@@ -605,7 +1136,9 @@ export default function Footer() {
 
       <button
         type="button"
-        onClick={scrollToTop}
+        onClick={
+          scrollToTop
+        }
         aria-label="Back to top"
         title="Back to top"
         className="
@@ -629,8 +1162,11 @@ export default function Footer() {
           hover:shadow-xl
         "
       >
-        <ArrowUp size={19} />
+        <ArrowUp
+          size={19}
+        />
       </button>
+
     </footer>
   );
 }

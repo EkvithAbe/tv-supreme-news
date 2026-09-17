@@ -3,30 +3,114 @@ import { NextResponse } from "next/server";
 import {
   createCategory,
   deleteCategory,
+  getCategories,
   getCategoryById,
   updateCategory,
 } from "@/lib/data/categories";
 
-export async function POST(request: Request) {
+const validLanguages = [
+  "EN",
+  "SI",
+  "TA",
+] as const;
+
+type CategoryLanguage =
+  (typeof validLanguages)[number];
+
+function getValidLanguage(
+  value: string | null,
+): CategoryLanguage {
+  if (
+    value &&
+    validLanguages.includes(
+      value as CategoryLanguage,
+    )
+  ) {
+    return value as CategoryLanguage;
+  }
+
+  return "EN";
+}
+
+/**
+ * GET /api/admin/categories
+ *
+ * Example:
+ * /api/admin/categories?language=EN
+ * /api/admin/categories?language=SI
+ * /api/admin/categories?language=TA
+ */
+export async function GET(
+  request: Request,
+) {
   try {
-    const body = await request.json();
+    const { searchParams } =
+      new URL(request.url);
 
-    const created = await createCategory({
-      slug: body.slug,
-      translations: body.translations,
+    const language =
+      getValidLanguage(
+        searchParams.get("language"),
+      );
+
+    const categories =
+      await getCategories(language);
+
+    return NextResponse.json({
+      success: true,
+      categories,
     });
-
-    const category = await getCategoryById(
-      created.id,
-      "EN",
+  } catch (error) {
+    console.error(
+      "GET /api/admin/categories:",
+      error,
     );
+
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to load categories.",
+      },
+      {
+        status: 500,
+      },
+    );
+  }
+}
+
+/**
+ * POST /api/admin/categories
+ */
+export async function POST(
+  request: Request,
+) {
+  try {
+    const body =
+      await request.json();
+
+    const created =
+      await createCategory({
+        slug: body.slug,
+        translations:
+          body.translations,
+      });
+
+    const category =
+      await getCategoryById(
+        created.id,
+        "EN",
+      );
 
     return NextResponse.json(
       {
         success: true,
         category,
       },
-      { status: 201 },
+      {
+        status: 201,
+      },
     );
   } catch (error) {
     console.error(
@@ -36,38 +120,56 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
+        success: false,
         error:
           error instanceof Error
             ? error.message
             : "Unable to create category.",
       },
-      { status: 400 },
+      {
+        status: 400,
+      },
     );
   }
 }
 
-export async function PUT(request: Request) {
+/**
+ * PUT /api/admin/categories
+ */
+export async function PUT(
+  request: Request,
+) {
   try {
-    const body = await request.json();
+    const body =
+      await request.json();
 
     if (!body.id) {
       return NextResponse.json(
         {
-          error: "Category ID is required.",
+          success: false,
+          error:
+            "Category ID is required.",
         },
-        { status: 400 },
+        {
+          status: 400,
+        },
       );
     }
 
-    await updateCategory(body.id, {
-      slug: body.slug,
-      translations: body.translations,
-    });
-
-    const category = await getCategoryById(
+    await updateCategory(
       body.id,
-      "EN",
+      {
+        slug: body.slug,
+        translations:
+          body.translations,
+      },
     );
+
+    const category =
+      await getCategoryById(
+        body.id,
+        "EN",
+      );
 
     return NextResponse.json({
       success: true,
@@ -81,28 +183,42 @@ export async function PUT(request: Request) {
 
     return NextResponse.json(
       {
+        success: false,
         error:
           error instanceof Error
             ? error.message
             : "Unable to update category.",
       },
-      { status: 400 },
+      {
+        status: 400,
+      },
     );
   }
 }
 
-export async function DELETE(request: Request) {
+/**
+ * DELETE /api/admin/categories?id=CATEGORY_ID
+ */
+export async function DELETE(
+  request: Request,
+) {
   try {
-    const { searchParams } = new URL(request.url);
+    const { searchParams } =
+      new URL(request.url);
 
-    const id = searchParams.get("id");
+    const id =
+      searchParams.get("id");
 
     if (!id) {
       return NextResponse.json(
         {
-          error: "Category ID is required.",
+          success: false,
+          error:
+            "Category ID is required.",
         },
-        { status: 400 },
+        {
+          status: 400,
+        },
       );
     }
 
@@ -119,12 +235,15 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json(
       {
+        success: false,
         error:
           error instanceof Error
             ? error.message
             : "Unable to delete category.",
       },
-      { status: 400 },
+      {
+        status: 400,
+      },
     );
   }
 }

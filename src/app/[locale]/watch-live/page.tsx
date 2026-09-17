@@ -11,15 +11,166 @@ import {
   Video,
 } from "lucide-react";
 
-const LIVE_STREAM_URL =
-  "https://player.castr.com/live_3b18e370d0f011efa5904f4336ecbf7e";
+import { getLiveTVSettings } from "@/lib/data/live-tv";
 
-export default function WatchLivePage() {
+export const dynamic = "force-dynamic";
+
+interface WatchLivePageProps {
+  params: Promise<{
+    locale: string;
+  }>;
+}
+
+type PublicStreamType =
+  | "HLS"
+  | "MP4"
+  | "EMBED"
+  | "OTHER";
+
+function getPlayerUrl(
+  settings: Awaited<
+    ReturnType<typeof getLiveTVSettings>
+  >,
+) {
+  if (!settings) {
+    return "";
+  }
+
+  const primaryUrl =
+    settings.streamUrl?.trim() ?? "";
+
+  const fallbackUrl =
+    settings.fallbackUrl?.trim() ?? "";
+
+  return primaryUrl || fallbackUrl;
+}
+
+function normalizeStreamType(
+  value: string | undefined,
+): PublicStreamType {
+  switch (value) {
+    case "MP4":
+      return "MP4";
+
+    case "EMBED":
+      return "EMBED";
+
+    case "OTHER":
+      return "OTHER";
+
+    case "HLS":
+    default:
+      return "HLS";
+  }
+}
+
+function isHostedPlayerUrl(url: string) {
+  const normalizedUrl = url.toLowerCase();
+
+  return (
+    normalizedUrl.includes("player.castr.com") ||
+    normalizedUrl.includes("youtube.com/embed") ||
+    normalizedUrl.includes(
+      "youtube-nocookie.com/embed",
+    ) ||
+    normalizedUrl.includes("player.vimeo.com")
+  );
+}
+
+function isHlsUrl(url: string) {
+  const normalizedUrl = url.toLowerCase();
+
+  return (
+    normalizedUrl.includes(".m3u8") ||
+    normalizedUrl.includes(
+      "application/vnd.apple.mpegurl",
+    ) ||
+    normalizedUrl.includes(
+      "application/x-mpegurl",
+    )
+  );
+}
+
+export default async function WatchLivePage({
+  params,
+}: WatchLivePageProps) {
+  const { locale } = await params;
+
+  const settings = await getLiveTVSettings();
+
+  const hasSettings = Boolean(settings);
+
+  /*
+   * IMPORTANT:
+   *
+   * Player availability is separate from broadcast status.
+   *
+   * Previously the player was only rendered when:
+   *
+   *   isEnabled && isLive
+   *
+   * That meant an otherwise valid Castr player was hidden
+   * whenever the CMS status was OFFLINE.
+   *
+   * Now the configured player can still be displayed when
+   * Live TV is enabled, while the actual LIVE/OFFLINE status
+   * remains controlled by isLive.
+   */
+  const isEnabled =
+    settings?.isEnabled ?? false;
+
+  const isLive =
+    settings?.isLive ?? false;
+
+  const playerUrl =
+    getPlayerUrl(settings);
+
+  const canRenderPlayer =
+    Boolean(isEnabled && playerUrl);
+
+  const channelName =
+    settings?.channelName ||
+    "TV SUPREME";
+
+  const playerTitle =
+    settings?.playerTitle ||
+    "TV SUPREME Live";
+
+  const streamType =
+    normalizeStreamType(
+      settings?.streamType,
+    );
+
+  const autoPlay =
+    settings?.autoPlay ?? true;
+
+  const showChat =
+    settings?.showChat ?? false;
+
+  const latestHref =
+    `/${locale}/latest`;
+
+  const videoHref =
+    `/${locale}/video`;
+
+  const isHostedPlayer =
+    isHostedPlayerUrl(playerUrl) ||
+    streamType === "EMBED";
+
+  const isMp4 =
+    streamType === "MP4";
+
+  const isDirectHls =
+    streamType === "HLS" &&
+    isHlsUrl(playerUrl) &&
+    !isHostedPlayer;
+
   return (
     <main className="min-h-screen bg-white">
       {/* =========================================================
           HERO
       ========================================================== */}
+
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-[#3c2372] via-[#5f19c8] to-[#ec008c]" />
 
@@ -30,7 +181,8 @@ export default function WatchLivePage() {
             <div className="max-w-3xl">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-white backdrop-blur">
                 <Radio size={14} />
-                TV SUPREME Live
+
+                {channelName}
               </div>
 
               <h1 className="mt-5 text-4xl font-black tracking-tight text-white sm:text-5xl lg:text-6xl">
@@ -38,18 +190,35 @@ export default function WatchLivePage() {
               </h1>
 
               <p className="mt-4 max-w-2xl text-sm leading-7 text-white/80 sm:text-base">
-                Watch TV SUPREME live coverage, breaking news,
-                programmes and special broadcasts online.
+                Watch TV SUPREME live coverage, breaking
+                news, programmes and special broadcasts
+                online.
               </p>
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
-                <span className="inline-flex items-center gap-2 rounded-full bg-red-500/15 px-3 py-1.5 text-xs font-bold text-white ring-1 ring-red-300/20">
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-red-400" />
-                  LIVE NOW
+                <span
+                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold text-white ring-1 ${
+                    isLive
+                      ? "bg-red-500/15 ring-red-300/20"
+                      : "bg-slate-500/20 ring-white/15"
+                  }`}
+                >
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      isLive
+                        ? "animate-pulse bg-red-400"
+                        : "bg-slate-300"
+                    }`}
+                  />
+
+                  {isLive
+                    ? "LIVE NOW"
+                    : "OFFLINE"}
                 </span>
 
                 <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/80">
                   <Globe2 size={13} />
+
                   Live online
                 </span>
               </div>
@@ -61,11 +230,20 @@ export default function WatchLivePage() {
       {/* =========================================================
           LIVE PLAYER
       ========================================================== */}
-      <section className="py-8 sm:py-10 lg:py-12">
+
+      <section
+        id="live-player"
+        className="py-8 sm:py-10 lg:py-12"
+      >
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
-            {/* Player */}
+            {/* =====================================================
+                PLAYER CARD
+            ====================================================== */}
+
             <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-[#111d4a] shadow-xl">
+              {/* Player Header */}
+
               <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-[#0d142d] px-4 py-3 sm:px-5">
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-pink-600 to-purple-600">
@@ -77,7 +255,7 @@ export default function WatchLivePage() {
 
                   <div>
                     <p className="text-xs font-bold text-white">
-                      TV SUPREME
+                      {channelName}
                     </p>
 
                     <p className="mt-0.5 text-[10px] text-white/50">
@@ -86,29 +264,148 @@ export default function WatchLivePage() {
                   </div>
                 </div>
 
-                <span className="inline-flex items-center gap-2 rounded-full bg-red-500/15 px-3 py-1.5 text-[10px] font-bold text-red-300">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-400" />
-                  LIVE
+                <span
+                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[10px] font-bold ${
+                    isLive
+                      ? "bg-red-500/15 text-red-300"
+                      : "bg-white/10 text-white/50"
+                  }`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      isLive
+                        ? "animate-pulse bg-red-400"
+                        : "bg-slate-500"
+                    }`}
+                  />
+
+                  {isLive
+                    ? "LIVE"
+                    : "OFFLINE"}
                 </span>
               </div>
 
-              {/* Responsive Castr player */}
+              {/* ===================================================
+                  PLAYER
+              ==================================================== */}
+
               <div className="relative aspect-video w-full bg-black">
-                <iframe
-                  src={LIVE_STREAM_URL}
-                  title="TV SUPREME Live"
-                  className="absolute inset-0 h-full w-full border-0"
-                  allow="autoplay; fullscreen; picture-in-picture"
-                  allowFullScreen
-                  loading="eager"
-                />
+                {canRenderPlayer ? (
+                  <>
+                    {/* =================================================
+                        CASTR / HOSTED EMBED
+                    ================================================== */}
+
+                    {isHostedPlayer ? (
+                      <iframe
+                        src={playerUrl}
+                        title={playerTitle}
+                        className="absolute inset-0 h-full w-full border-0"
+                        allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+                        allowFullScreen
+                        loading="eager"
+                      />
+                    ) : isMp4 ? (
+                      /* =================================================
+                         MP4
+                      ================================================== */
+
+                      <video
+                        src={playerUrl}
+                        title={playerTitle}
+                        className="absolute inset-0 h-full w-full bg-black object-contain"
+                        controls
+                        playsInline
+                        autoPlay={autoPlay}
+                        muted={autoPlay}
+                        preload="metadata"
+                      />
+                    ) : isDirectHls ? (
+                      /* =================================================
+                         DIRECT HLS
+                      ================================================== */
+
+                      <video
+                        src={playerUrl}
+                        title={playerTitle}
+                        className="absolute inset-0 h-full w-full bg-black object-contain"
+                        controls
+                        playsInline
+                        autoPlay={autoPlay}
+                        muted={autoPlay}
+                        preload="metadata"
+                      />
+                    ) : (
+                      /* =================================================
+                         OTHER
+                      ================================================== */
+
+                      <iframe
+                        src={playerUrl}
+                        title={playerTitle}
+                        className="absolute inset-0 h-full w-full border-0"
+                        allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+                        allowFullScreen
+                        loading="eager"
+                      />
+                    )}
+
+                    {/* =================================================
+                        OFFLINE OVERLAY
+                    ================================================== */}
+
+                    {!isLive && (
+                      <div className="pointer-events-none absolute left-4 top-4 z-10">
+                        <span className="inline-flex items-center gap-2 rounded-full bg-black/70 px-3 py-1.5 text-[10px] font-bold text-white backdrop-blur-sm">
+                          <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+
+                          BROADCAST OFFLINE
+                        </span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  /* ===================================================
+                     NO PLAYER CONFIGURATION
+                  ==================================================== */
+
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-[#151b35] via-[#20264a] to-[#101527] px-6 text-center">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-600 to-purple-600 text-white shadow-xl">
+                      <Radio size={28} />
+                    </div>
+
+                    <p className="mt-4 text-xs font-bold uppercase tracking-[0.2em] text-pink-300">
+                      {!hasSettings
+                        ? "Live TV Unavailable"
+                        : !isEnabled
+                          ? "Live TV Disabled"
+                          : "Live TV"}
+                    </p>
+
+                    <h3 className="mt-2 text-xl font-bold text-white">
+                      {playerTitle}
+                    </h3>
+
+                    <p className="mt-2 max-w-md text-xs leading-5 text-slate-400">
+                      {!hasSettings
+                        ? "Live TV has not been configured yet."
+                        : !isEnabled
+                          ? "Live TV is currently disabled."
+                          : !playerUrl
+                            ? "Add a stream URL to connect the live player."
+                            : "The live player is currently unavailable."}
+                    </p>
+                  </div>
+                )}
               </div>
+
+              {/* Player Footer */}
 
               <div className="border-t border-white/10 bg-[#0d142d] px-4 py-3 sm:px-5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-bold text-white">
-                      TV SUPREME Live Stream
+                      {playerTitle}
                     </p>
 
                     <p className="mt-1 text-xs text-white/50">
@@ -116,12 +413,21 @@ export default function WatchLivePage() {
                     </p>
                   </div>
 
-                  <span className="inline-flex w-fit items-center gap-2 rounded-lg bg-white/5 px-3 py-2 text-xs text-white/60">
+                  <span
+                    className={`inline-flex w-fit items-center gap-2 rounded-lg px-3 py-2 text-xs ${
+                      isLive
+                        ? "bg-white/5 text-white/60"
+                        : "bg-slate-800 text-slate-500"
+                    }`}
+                  >
                     <Play
                       size={13}
                       fill="currentColor"
                     />
-                    Online
+
+                    {isLive
+                      ? "Online"
+                      : "Offline"}
                   </span>
                 </div>
               </div>
@@ -130,8 +436,10 @@ export default function WatchLivePage() {
             {/* =====================================================
                 RIGHT SIDEBAR
             ====================================================== */}
+
             <aside className="space-y-5">
               {/* Now Live */}
+
               <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
                 <div className="border-b border-slate-200 px-5 py-4">
                   <div className="flex items-center gap-3">
@@ -153,24 +461,43 @@ export default function WatchLivePage() {
 
                 <div className="p-5">
                   <div className="rounded-2xl bg-gradient-to-br from-[#111d4a] to-[#2e205f] p-5 text-white">
-                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-red-300">
-                      <span className="h-2 w-2 animate-pulse rounded-full bg-red-400" />
-                      Live
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide">
+                      <span
+                        className={`h-2 w-2 rounded-full ${
+                          isLive
+                            ? "animate-pulse bg-red-400"
+                            : "bg-slate-500"
+                        }`}
+                      />
+
+                      <span
+                        className={
+                          isLive
+                            ? "text-red-300"
+                            : "text-slate-400"
+                        }
+                      >
+                        {isLive
+                          ? "Live"
+                          : "Offline"}
+                      </span>
                     </div>
 
                     <h3 className="mt-3 text-lg font-black">
-                      TV SUPREME Live
+                      {channelName}
                     </h3>
 
                     <p className="mt-2 text-xs leading-5 text-white/60">
-                      Watch the current live stream directly on the
-                      website.
+                      {isLive
+                        ? "Watch the current live stream directly on the website."
+                        : "The live player is configured, but there is currently no active broadcast."}
                     </p>
                   </div>
                 </div>
               </section>
 
               {/* Quick Links */}
+
               <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
                 <div className="border-b border-slate-200 px-5 py-4">
                   <h2 className="text-sm font-bold text-[#111d4a]">
@@ -180,14 +507,14 @@ export default function WatchLivePage() {
 
                 <div className="p-3">
                   <LiveQuickLink
-                    href="/en/latest"
+                    href={latestHref}
                     icon={<Bell size={16} />}
                     title="Latest News"
                     text="Read the latest stories"
                   />
 
                   <LiveQuickLink
-                    href="/en/video"
+                    href={videoHref}
                     icon={<Video size={16} />}
                     title="Featured Videos"
                     text="Watch video coverage"
@@ -203,12 +530,44 @@ export default function WatchLivePage() {
               </section>
             </aside>
           </div>
+
+          {/* =======================================================
+              OPTIONAL LIVE CHAT
+          ======================================================== */}
+
+          {showChat && (
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-pink-50 text-pink-600">
+                  <Radio size={17} />
+                </div>
+
+                <div>
+                  <h2 className="text-sm font-bold text-[#111d4a]">
+                    Live Chat
+                  </h2>
+
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    Live chat is enabled for this broadcast.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-xl bg-slate-50 px-4 py-8 text-center">
+                <p className="text-sm font-medium text-slate-500">
+                  Live chat integration can be connected
+                  here later.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
       {/* =========================================================
           LIVE INFORMATION
       ========================================================== */}
+
       <section className="bg-[#f8f7fc] py-14 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
@@ -221,8 +580,9 @@ export default function WatchLivePage() {
             </h2>
 
             <p className="mt-4 text-sm leading-7 text-slate-500 sm:text-base">
-              Watch TV SUPREME online and stay up to date with current
-              news, live coverage and special broadcasts.
+              Watch TV SUPREME online and stay up to date
+              with current news, live coverage and special
+              broadcasts.
             </p>
           </div>
 
@@ -249,12 +609,12 @@ export default function WatchLivePage() {
       </section>
 
       {/* =========================================================
-          SCHEDULE / INFO
+          EXPERIENCE
       ========================================================== */}
+
       <section className="py-14 sm:py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-8 lg:grid-cols-[1fr_0.85fr] lg:items-center">
-            {/* Schedule */}
             <div>
               <span className="text-sm font-bold uppercase tracking-[0.16em] text-pink-600">
                 Live Experience
@@ -265,8 +625,9 @@ export default function WatchLivePage() {
               </h2>
 
               <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-500 sm:text-base">
-                The TV SUPREME live experience is designed to work
-                across desktop, tablet and mobile devices.
+                The TV SUPREME live experience is designed
+                to work across desktop, tablet and mobile
+                devices.
               </p>
 
               <div className="mt-7 space-y-3">
@@ -290,14 +651,13 @@ export default function WatchLivePage() {
               </div>
             </div>
 
-            {/* Highlight */}
             <div className="overflow-hidden rounded-[28px] bg-gradient-to-br from-[#111d4a] via-[#2c215f] to-[#5f19c8] p-6 text-white shadow-xl sm:p-8">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/10">
                 <Radio size={22} />
               </div>
 
               <p className="mt-6 text-xs font-bold uppercase tracking-[0.18em] text-white/50">
-                TV SUPREME
+                {channelName}
               </p>
 
               <h3 className="mt-2 text-2xl font-black">
@@ -305,8 +665,9 @@ export default function WatchLivePage() {
               </h3>
 
               <p className="mt-3 text-sm leading-6 text-white/65">
-                Keep this page open during major news events and
-                special coverage to watch the live broadcast.
+                Keep this page open during major news events
+                and special coverage to watch the live
+                broadcast.
               </p>
 
               <a
@@ -317,6 +678,7 @@ export default function WatchLivePage() {
                   size={15}
                   fill="currentColor"
                 />
+
                 Watch Live
               </a>
             </div>
@@ -327,12 +689,13 @@ export default function WatchLivePage() {
       {/* =========================================================
           CTA
       ========================================================== */}
+
       <section className="px-4 pb-14 sm:px-6 sm:pb-16 lg:px-8">
         <div className="mx-auto max-w-7xl overflow-hidden rounded-[28px] bg-gradient-to-r from-[#ec008c] via-[#8b1fc8] to-[#3c2372]">
           <div className="px-6 py-10 sm:px-10 sm:py-12 lg:flex lg:items-center lg:justify-between lg:px-14">
             <div className="max-w-2xl">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/70">
-                TV SUPREME
+                {channelName}
               </p>
 
               <h2 className="mt-3 text-2xl font-black text-white sm:text-3xl">
@@ -340,25 +703,27 @@ export default function WatchLivePage() {
               </h2>
 
               <p className="mt-3 text-sm leading-6 text-white/75">
-                Explore the latest news, videos and live coverage from
-                TV SUPREME.
+                Explore the latest news, videos and live
+                coverage from TV SUPREME.
               </p>
             </div>
 
             <div className="mt-6 flex flex-wrap gap-3 lg:mt-0">
               <Link
-                href="/en/latest"
+                href={latestHref}
                 className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-[#3c2372] transition hover:bg-slate-100"
               >
                 Latest News
+
                 <ChevronRight size={16} />
               </Link>
 
               <Link
-                href="/en/video"
+                href={videoHref}
                 className="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-5 py-3 text-sm font-bold text-white backdrop-blur transition hover:bg-white/20"
               >
                 Videos
+
                 <Video size={16} />
               </Link>
             </div>
@@ -371,7 +736,7 @@ export default function WatchLivePage() {
 
 /* ===============================================================
    QUICK LINK
-================================================================ */
+=============================================================== */
 
 function LiveQuickLink({
   href,
@@ -413,7 +778,7 @@ function LiveQuickLink({
 
 /* ===============================================================
    INFO CARD
-================================================================ */
+=============================================================== */
 
 function LiveInfoCard({
   icon,
@@ -443,7 +808,7 @@ function LiveInfoCard({
 
 /* ===============================================================
    EXPERIENCE ROW
-================================================================ */
+=============================================================== */
 
 function ExperienceRow({
   icon,
@@ -475,7 +840,7 @@ function ExperienceRow({
 
 /* ===============================================================
    MONITOR ICON
-================================================================ */
+=============================================================== */
 
 function MonitorIcon() {
   return (
@@ -497,6 +862,7 @@ function MonitorIcon() {
         height="12"
         rx="2"
       />
+
       <path d="M8 20h8" />
       <path d="M12 16v4" />
     </svg>
@@ -505,7 +871,7 @@ function MonitorIcon() {
 
 /* ===============================================================
    SMARTPHONE ICON
-================================================================ */
+=============================================================== */
 
 function SmartphoneIcon() {
   return (
@@ -527,6 +893,7 @@ function SmartphoneIcon() {
         height="20"
         rx="2"
       />
+
       <path d="M10 18h4" />
     </svg>
   );

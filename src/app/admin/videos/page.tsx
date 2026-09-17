@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
 import {
   CalendarClock,
   CheckCircle2,
@@ -9,6 +10,7 @@ import {
   Edit3,
   Eye,
   FileVideo,
+  Loader2,
   MoreHorizontal,
   Play,
   Plus,
@@ -16,7 +18,6 @@ import {
   Trash2,
   Video,
   X,
-  Zap,
 } from "lucide-react";
 
 type VideoStatus =
@@ -26,113 +27,41 @@ type VideoStatus =
   | "Published"
   | "Archived";
 
+type LanguageLabel =
+  | "English"
+  | "Sinhala"
+  | "Tamil";
+
+type CategoryOption = {
+  id: string;
+  name: string;
+  slug?: string;
+};
+
+type ThumbnailOption = {
+  id: string;
+  name: string;
+  url: string;
+};
+
 type VideoItem = {
-  id: number;
+  id: string;
+  slug: string;
   title: string;
   description: string;
   thumbnail: string;
+  thumbnailId: string | null;
   category: string;
+  categoryId: string | null;
   status: VideoStatus;
-  language: string;
+  language: LanguageLabel;
   duration: string;
   views: number;
   publishedAt: string;
+  scheduledAt: string;
   featured: boolean;
   videoUrl: string;
 };
-
-const initialVideos: VideoItem[] = [
-  {
-    id: 1,
-    title: "Sri Lanka's incredible wildlife – A closer look",
-    description:
-      "A closer look at Sri Lanka's extraordinary wildlife and natural beauty.",
-    thumbnail: "/images/news/world.jpg",
-    category: "Lifestyle",
-    status: "Published",
-    language: "English",
-    duration: "4:12",
-    views: 8400,
-    publishedAt: "14 Sep 2026",
-    featured: true,
-    videoUrl: "",
-  },
-  {
-    id: 2,
-    title: "Colombo: A city of new opportunities",
-    description:
-      "Exploring Colombo's changing business and urban landscape.",
-    thumbnail: "/images/news/port.jpg",
-    category: "Business",
-    status: "Published",
-    language: "English",
-    duration: "6:25",
-    views: 12000,
-    publishedAt: "13 Sep 2026",
-    featured: true,
-    videoUrl: "",
-  },
-  {
-    id: 3,
-    title: "In Conversation with Change Makers",
-    description:
-      "An interview with people creating meaningful change in Sri Lanka.",
-    thumbnail: "/images/news/president.jpg",
-    category: "Sri Lanka",
-    status: "Review",
-    language: "English",
-    duration: "3:40",
-    views: 5100,
-    publishedAt: "12 Sep 2026",
-    featured: false,
-    videoUrl: "",
-  },
-  {
-    id: 4,
-    title: "Latest technology trends you should know",
-    description:
-      "The latest developments in AI, technology and digital innovation.",
-    thumbnail: "/images/news/technology.jpg",
-    category: "Technology",
-    status: "Draft",
-    language: "English",
-    duration: "5:18",
-    views: 0,
-    publishedAt: "—",
-    featured: false,
-    videoUrl: "",
-  },
-  {
-    id: 5,
-    title: "Sri Lanka cricket: Match day analysis",
-    description:
-      "Expert analysis and highlights from the latest Sri Lanka cricket action.",
-    thumbnail: "/images/news/cricket.jpg",
-    category: "Sports",
-    status: "Scheduled",
-    language: "English",
-    duration: "8:05",
-    views: 0,
-    publishedAt: "16 Sep 2026",
-    featured: false,
-    videoUrl: "",
-  },
-  {
-    id: 6,
-    title: "Weather update across the island",
-    description:
-      "The latest weather conditions and forecast for Sri Lanka.",
-    thumbnail: "/images/news/rain.jpg",
-    category: "Sri Lanka",
-    status: "Archived",
-    language: "English",
-    duration: "2:36",
-    views: 6400,
-    publishedAt: "10 Sep 2026",
-    featured: false,
-    videoUrl: "",
-  },
-];
 
 const statusFilters = [
   { label: "All Videos", value: "All" },
@@ -143,34 +72,406 @@ const statusFilters = [
   { label: "Archived", value: "Archived" },
 ] as const;
 
-const categories = [
-  "All Categories",
-  "Sri Lanka",
-  "World",
-  "Politics",
-  "Business",
-  "Sports",
-  "Entertainment",
-  "Technology",
-  "Lifestyle",
-];
+function mapStatusFromApi(
+  status: string,
+): VideoStatus {
+  switch (status) {
+    case "REVIEW":
+      return "Review";
+    case "SCHEDULED":
+      return "Scheduled";
+    case "PUBLISHED":
+      return "Published";
+    case "ARCHIVED":
+      return "Archived";
+    default:
+      return "Draft";
+  }
+}
+
+function mapStatusToApi(
+  status: VideoStatus,
+): string {
+  switch (status) {
+    case "Review":
+      return "REVIEW";
+    case "Scheduled":
+      return "SCHEDULED";
+    case "Published":
+      return "PUBLISHED";
+    case "Archived":
+      return "ARCHIVED";
+    default:
+      return "DRAFT";
+  }
+}
+
+function mapLanguageFromApi(
+  language: string,
+): LanguageLabel {
+  switch (language) {
+    case "SI":
+      return "Sinhala";
+    case "TA":
+      return "Tamil";
+    default:
+      return "English";
+  }
+}
+
+function mapLanguageToApi(
+  language: LanguageLabel,
+): string {
+  switch (language) {
+    case "Sinhala":
+      return "SI";
+    case "Tamil":
+      return "TA";
+    default:
+      return "EN";
+  }
+}
+
+function formatDuration(
+  seconds: number | null | undefined,
+): string {
+  if (
+    seconds === null ||
+    seconds === undefined ||
+    !Number.isFinite(seconds)
+  ) {
+    return "0:00";
+  }
+
+  const totalSeconds = Math.max(
+    0,
+    Math.floor(seconds),
+  );
+
+  const minutes = Math.floor(
+    totalSeconds / 60,
+  );
+
+  const remainingSeconds =
+    totalSeconds % 60;
+
+  return `${minutes}:${String(
+    remainingSeconds,
+  ).padStart(2, "0")}`;
+}
+
+function parseDuration(
+  value: string,
+): number | null {
+  const clean = value.trim();
+
+  if (!clean) {
+    return null;
+  }
+
+  if (clean.includes(":")) {
+    const parts = clean.split(":");
+
+    if (parts.length !== 2) {
+      return null;
+    }
+
+    const minutes = Number(parts[0]);
+    const seconds = Number(parts[1]);
+
+    if (
+      !Number.isFinite(minutes) ||
+      !Number.isFinite(seconds) ||
+      minutes < 0 ||
+      seconds < 0 ||
+      seconds >= 60
+    ) {
+      return null;
+    }
+
+    return Math.floor(
+      minutes * 60 + seconds,
+    );
+  }
+
+  const seconds = Number(clean);
+
+  if (
+    !Number.isFinite(seconds) ||
+    seconds < 0
+  ) {
+    return null;
+  }
+
+  return Math.floor(seconds);
+}
+
+function formatDate(
+  value: string | null | undefined,
+): string {
+  if (!value) {
+    return "—";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return date.toLocaleDateString(
+    undefined,
+    {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    },
+  );
+}
+
+function toDateTimeLocal(
+  value: string | null | undefined,
+): string {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const pad = (number: number) =>
+    String(number).padStart(2, "0");
+
+  return `${date.getFullYear()}-${pad(
+    date.getMonth() + 1,
+  )}-${pad(
+    date.getDate(),
+  )}T${pad(
+    date.getHours(),
+  )}:${pad(
+    date.getMinutes(),
+  )}`;
+}
+
+function formatViews(
+  views: number,
+): string {
+  if (views >= 1000000) {
+    return `${(
+      views / 1000000
+    ).toFixed(1)}M`;
+  }
+
+  if (views >= 1000) {
+    return `${(
+      views / 1000
+    ).toFixed(
+      views >= 10000 ? 0 : 1,
+    )}K`;
+  }
+
+  return String(views);
+}
+
+function mapApiVideo(
+  item: {
+    id: string;
+    slug: string;
+    title: string;
+    description: string | null;
+    language: string;
+    status: string;
+    categoryId: string | null;
+    categoryName: string | null;
+    thumbnailId: string | null;
+    thumbnailUrl: string | null;
+    videoUrl: string;
+    duration: number | null;
+    views: number;
+    isFeatured: boolean;
+    publishedAt: string | null;
+    scheduledAt: string | null;
+  },
+): VideoItem {
+  return {
+    id: item.id,
+    slug: item.slug,
+    title: item.title,
+    description:
+      item.description ?? "",
+    thumbnail:
+      item.thumbnailUrl ||
+      "/images/home/live-tv.jpg",
+    thumbnailId:
+      item.thumbnailId,
+    category:
+      item.categoryName ||
+      "Uncategorized",
+    categoryId:
+      item.categoryId,
+    status:
+      mapStatusFromApi(item.status),
+    language:
+      mapLanguageFromApi(
+        item.language,
+      ),
+    duration:
+      formatDuration(item.duration),
+    views: item.views,
+    publishedAt:
+      formatDate(item.publishedAt),
+    scheduledAt:
+      formatDate(item.scheduledAt),
+    featured:
+      item.isFeatured,
+    videoUrl: item.videoUrl,
+  };
+}
+
+function parseApiVideos(
+  items: unknown[],
+): VideoItem[] {
+  return items
+    .filter(
+      (
+        item,
+      ): item is Record<string, unknown> =>
+        Boolean(item) &&
+        typeof item === "object",
+    )
+    .map(
+      (
+        item: Record<string, unknown>,
+      ) =>
+        mapApiVideo({
+          id: String(
+            item.id ?? "",
+          ),
+          slug: String(
+            item.slug ?? "",
+          ),
+          title: String(
+            item.title ?? "",
+          ),
+          description:
+            item.description ===
+              null ||
+            item.description ===
+              undefined
+              ? null
+              : String(
+                  item.description,
+                ),
+          language: String(
+            item.language ?? "EN",
+          ),
+          status: String(
+            item.status ?? "DRAFT",
+          ),
+          categoryId:
+            item.categoryId ===
+              null ||
+            item.categoryId ===
+              undefined
+              ? null
+              : String(
+                  item.categoryId,
+                ),
+          categoryName:
+            item.categoryName ===
+              null ||
+            item.categoryName ===
+              undefined
+              ? null
+              : String(
+                  item.categoryName,
+                ),
+          thumbnailId:
+            item.thumbnailId ===
+              null ||
+            item.thumbnailId ===
+              undefined
+              ? null
+              : String(
+                  item.thumbnailId,
+                ),
+          thumbnailUrl:
+            item.thumbnailUrl ===
+              null ||
+            item.thumbnailUrl ===
+              undefined
+              ? null
+              : String(
+                  item.thumbnailUrl,
+                ),
+          videoUrl: String(
+            item.videoUrl ?? "",
+          ),
+          duration:
+            typeof item.duration ===
+            "number"
+              ? item.duration
+              : null,
+          views:
+            typeof item.views ===
+            "number"
+              ? item.views
+              : 0,
+          isFeatured:
+            item.isFeatured === true,
+          publishedAt:
+            item.publishedAt ===
+              null ||
+            item.publishedAt ===
+              undefined
+              ? null
+              : String(
+                  item.publishedAt,
+                ),
+          scheduledAt:
+            item.scheduledAt ===
+              null ||
+            item.scheduledAt ===
+              undefined
+              ? null
+              : String(
+                  item.scheduledAt,
+                ),
+        }),
+    );
+}
 
 export default function VideosPage() {
-  const [videos, setVideos] = useState<VideoItem[]>(
-    initialVideos
-  );
+  const [videos, setVideos] =
+    useState<VideoItem[]>([]);
 
-  const [search, setSearch] = useState("");
+  const [categories, setCategories] =
+    useState<CategoryOption[]>([]);
 
-  const [statusFilter, setStatusFilter] = useState<
-    (typeof statusFilters)[number]["value"]
-  >("All");
+  const [thumbnails, setThumbnails] =
+    useState<ThumbnailOption[]>([]);
 
-  const [categoryFilter, setCategoryFilter] = useState(
-    "All Categories"
-  );
+  const [search, setSearch] =
+    useState("");
 
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [statusFilter, setStatusFilter] =
+    useState<
+      (typeof statusFilters)[number]["value"]
+    >("All");
+
+  const [categoryFilter, setCategoryFilter] =
+    useState("All Categories");
+
+  const [sortOrder, setSortOrder] =
+    useState<
+      "latest" | "oldest" | "name"
+    >("latest");
+
+  const [showAddModal, setShowAddModal] =
+    useState(false);
 
   const [editingVideo, setEditingVideo] =
     useState<VideoItem | null>(null);
@@ -178,74 +479,414 @@ export default function VideosPage() {
   const [selectedVideo, setSelectedVideo] =
     useState<VideoItem | null>(null);
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("Sri Lanka");
-  const [language, setLanguage] = useState("English");
-  const [duration, setDuration] = useState("");
-  const [videoUrl, setVideoUrl] = useState("");
-  const [featured, setFeatured] = useState(false);
+  const [title, setTitle] =
+    useState("");
+
+  const [description, setDescription] =
+    useState("");
+
+  const [categoryId, setCategoryId] =
+    useState("");
+
+  const [language, setLanguage] =
+    useState<LanguageLabel>("English");
+
+  const [duration, setDuration] =
+    useState("");
+
+  const [videoUrl, setVideoUrl] =
+    useState("");
+
+  const [thumbnailId, setThumbnailId] =
+    useState("");
+
+  const [featured, setFeatured] =
+    useState(false);
+
   const [status, setStatus] =
     useState<VideoStatus>("Draft");
 
-  const filteredVideos = useMemo(() => {
-    const query = search.trim().toLowerCase();
+  const [scheduledAt, setScheduledAt] =
+    useState("");
 
-    return videos.filter((video) => {
-      const matchesSearch =
-        !query ||
-        video.title.toLowerCase().includes(query) ||
-        video.description.toLowerCase().includes(query) ||
-        video.category.toLowerCase().includes(query);
+  const [isLoading, setIsLoading] =
+    useState(true);
 
-      const matchesStatus =
-        statusFilter === "All" ||
-        video.status === statusFilter;
+  const [isSaving, setIsSaving] =
+    useState(false);
 
-      const matchesCategory =
-        categoryFilter === "All Categories" ||
-        video.category === categoryFilter;
+  const [error, setError] =
+    useState("");
 
-      return (
-        matchesSearch &&
-        matchesStatus &&
-        matchesCategory
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      setError("");
+
+      const [
+        videosResponse,
+        categoriesResponse,
+        mediaResponse,
+      ] = await Promise.all([
+        fetch(
+          "/api/admin/videos?page=1&pageSize=100",
+          {
+            cache: "no-store",
+          },
+        ),
+        fetch(
+          "/api/admin/categories?language=EN",
+          {
+            cache: "no-store",
+          },
+        ),
+        fetch(
+          "/api/admin/media?type=IMAGE&page=1&pageSize=100",
+          {
+            cache: "no-store",
+          },
+        ),
+      ]);
+
+      const [
+        videosData,
+        categoriesData,
+        mediaData,
+      ] = await Promise.all([
+        videosResponse.json(),
+        categoriesResponse.json(),
+        mediaResponse.json(),
+      ]);
+
+      if (
+        !videosResponse.ok ||
+        !videosData.success
+      ) {
+        throw new Error(
+          videosData.message ||
+            "Failed to load videos.",
+        );
+      }
+
+      const videoItems =
+        Array.isArray(
+          videosData.items,
+        )
+          ? videosData.items
+          : Array.isArray(
+                videosData.videos,
+              )
+            ? videosData.videos
+            : [];
+
+      setVideos(
+        parseApiVideos(
+          videoItems,
+        ),
       );
-    });
-  }, [videos, search, statusFilter, categoryFilter]);
 
-  const totalVideos = videos.length;
+      if (
+        categoriesResponse.ok &&
+        categoriesData.success
+      ) {
+        const categoryItems =
+          Array.isArray(
+            categoriesData.categories,
+          )
+            ? categoriesData.categories
+            : Array.isArray(
+                  categoriesData.items,
+                )
+              ? categoriesData.items
+              : [];
 
-  const publishedCount = videos.filter(
-    (video) => video.status === "Published"
-  ).length;
+        setCategories(
+          categoryItems
+            .filter(
+              (
+                item: unknown,
+              ): item is Record<
+                string,
+                unknown
+              > =>
+                Boolean(item) &&
+                typeof item ===
+                  "object",
+            )
+            .map(
+              (
+                item: Record<
+                  string,
+                  unknown
+                >,
+              ) => ({
+                id: String(
+                  item.id ?? "",
+                ),
+                name: String(
+                  item.name ??
+                    item.slug ??
+                    "Category",
+                ),
+                slug:
+                  item.slug ===
+                  undefined
+                    ? undefined
+                    : String(
+                        item.slug,
+                      ),
+              }),
+            )
+            .filter(
+              (
+                item: CategoryOption,
+              ) =>
+                Boolean(
+                  item.id,
+                ),
+            ),
+        );
+      } else {
+        setCategories([]);
+      }
 
-  const draftCount = videos.filter(
-    (video) => video.status === "Draft"
-  ).length;
+      if (
+        mediaResponse.ok &&
+        mediaData.success
+      ) {
+        const mediaItems =
+          Array.isArray(
+            mediaData.items,
+          )
+            ? mediaData.items
+            : [];
 
-  const scheduledCount = videos.filter(
-    (video) => video.status === "Scheduled"
-  ).length;
+        setThumbnails(
+          mediaItems
+            .filter(
+              (
+                item: unknown,
+              ): item is Record<
+                string,
+                unknown
+              > =>
+                Boolean(item) &&
+                typeof item ===
+                  "object" &&
+                String(
+                  (
+                    item as Record<
+                      string,
+                      unknown
+                    >
+                  ).type ?? "",
+                ) === "IMAGE" &&
+                Boolean(
+                  (
+                    item as Record<
+                      string,
+                      unknown
+                    >
+                  ).url,
+                ),
+            )
+            .map(
+              (
+                item: Record<
+                  string,
+                  unknown
+                >,
+              ) => ({
+                id: String(
+                  item.id ?? "",
+                ),
+                name: String(
+                  item.filename ??
+                    "Image",
+                ),
+                url: String(
+                  item.url ?? "",
+                ),
+              }),
+            )
+            .filter(
+              (
+                item: ThumbnailOption,
+              ) =>
+                Boolean(
+                  item.id,
+                ) &&
+                Boolean(
+                  item.url,
+                ),
+            ),
+        );
+      } else {
+        setThumbnails([]);
+      }
+    } catch (loadError) {
+      console.error(
+        "Failed to load video data:",
+        loadError,
+      );
 
-  const reviewCount = videos.filter(
-    (video) => video.status === "Review"
-  ).length;
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Failed to load video data.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  const totalViews = videos.reduce(
-    (sum, video) => sum + video.views,
-    0
+  useEffect(() => {
+    void loadData();
+  }, []);
+
+  const categoryNames = useMemo(
+    () => [
+      "All Categories",
+      ...categories.map(
+        (item: CategoryOption) =>
+          item.name,
+      ),
+    ],
+    [categories],
   );
+
+  const filteredVideos = useMemo(() => {
+    const query =
+      search.trim().toLowerCase();
+
+    const filtered =
+      videos.filter(
+        (video: VideoItem) => {
+          const matchesSearch =
+            !query ||
+            video.title
+              .toLowerCase()
+              .includes(query) ||
+            video.description
+              .toLowerCase()
+              .includes(query) ||
+            video.category
+              .toLowerCase()
+              .includes(query);
+
+          const matchesStatus =
+            statusFilter === "All" ||
+            video.status ===
+              statusFilter;
+
+          const matchesCategory =
+            categoryFilter ===
+              "All Categories" ||
+            video.category ===
+              categoryFilter;
+
+          return (
+            matchesSearch &&
+            matchesStatus &&
+            matchesCategory
+          );
+        },
+      );
+
+    return [...filtered].sort(
+      (
+        a: VideoItem,
+        b: VideoItem,
+      ) => {
+        if (
+          sortOrder === "name"
+        ) {
+          return a.title.localeCompare(
+            b.title,
+          );
+        }
+
+        const aIndex =
+          videos.indexOf(a);
+
+        const bIndex =
+          videos.indexOf(b);
+
+        if (
+          sortOrder === "oldest"
+        ) {
+          return (
+            aIndex - bIndex
+          );
+        }
+
+        return (
+          bIndex - aIndex
+        );
+      },
+    );
+  }, [
+    videos,
+    search,
+    statusFilter,
+    categoryFilter,
+    sortOrder,
+  ]);
+
+  const totalVideos =
+    videos.length;
+
+  const publishedCount =
+    videos.filter(
+      (video: VideoItem) =>
+        video.status ===
+        "Published",
+    ).length;
+
+  const draftCount =
+    videos.filter(
+      (video: VideoItem) =>
+        video.status ===
+        "Draft",
+    ).length;
+
+  const scheduledCount =
+    videos.filter(
+      (video: VideoItem) =>
+        video.status ===
+        "Scheduled",
+    ).length;
+
+  const reviewCount =
+    videos.filter(
+      (video: VideoItem) =>
+        video.status ===
+        "Review",
+    ).length;
+
+  const totalViews =
+    videos.reduce(
+      (
+        sum: number,
+        video: VideoItem,
+      ) =>
+        sum + video.views,
+      0,
+    );
 
   const resetForm = () => {
     setTitle("");
     setDescription("");
-    setCategory("Sri Lanka");
+    setCategoryId(
+      categories[0]?.id || "",
+    );
     setLanguage("English");
     setDuration("");
     setVideoUrl("");
+    setThumbnailId("");
     setFeatured(false);
     setStatus("Draft");
+    setScheduledAt("");
     setEditingVideo(null);
   };
 
@@ -254,116 +895,396 @@ export default function VideosPage() {
     setShowAddModal(true);
   };
 
-  const openEditModal = (video: VideoItem) => {
+  const openEditModal = (
+    video: VideoItem,
+  ) => {
     setEditingVideo(video);
     setTitle(video.title);
-    setDescription(video.description);
-    setCategory(video.category);
+    setDescription(
+      video.description,
+    );
+    setCategoryId(
+      video.categoryId || "",
+    );
     setLanguage(video.language);
     setDuration(video.duration);
     setVideoUrl(video.videoUrl);
+    setThumbnailId(
+      video.thumbnailId || "",
+    );
     setFeatured(video.featured);
     setStatus(video.status);
+
+    setScheduledAt(
+      video.scheduledAt === "—"
+        ? ""
+        : toDateTimeLocal(
+            video.scheduledAt,
+          ),
+    );
+
     setShowAddModal(true);
   };
 
   const closeModal = () => {
+    if (isSaving) {
+      return;
+    }
+
     setShowAddModal(false);
     resetForm();
   };
 
-  const saveVideo = () => {
-    const cleanTitle = title.trim();
+  const saveVideo = async () => {
+    const cleanTitle =
+      title.trim();
 
-    if (!cleanTitle) return;
+    const cleanDescription =
+      description.trim();
 
-    if (editingVideo) {
-      setVideos((current) =>
-        current.map((video) =>
-          video.id === editingVideo.id
-            ? {
-                ...video,
-                title: cleanTitle,
-                description: description.trim(),
-                category,
-                language,
-                duration: duration.trim() || "0:00",
-                videoUrl: videoUrl.trim(),
-                featured,
-                status,
-              }
-            : video
-        )
+    const cleanVideoUrl =
+      videoUrl.trim();
+
+    if (!cleanTitle) {
+      setError(
+        "Video title is required.",
       );
-    } else {
-      const newVideo: VideoItem = {
-        id:
-          Math.max(
-            0,
-            ...videos.map((video) => video.id)
-          ) + 1,
+      return;
+    }
+
+    if (!cleanVideoUrl) {
+      setError(
+        "Video URL is required.",
+      );
+      return;
+    }
+
+    const durationSeconds =
+      parseDuration(duration);
+
+    if (
+      duration.trim() &&
+      durationSeconds === null
+    ) {
+      setError(
+        "Duration must be in MM:SS format, for example 4:12.",
+      );
+      return;
+    }
+
+    if (
+      !categoryId &&
+      categories.length > 0
+    ) {
+      setError(
+        "Please select a category.",
+      );
+      return;
+    }
+
+    if (
+      status === "Scheduled" &&
+      !scheduledAt
+    ) {
+      setError(
+        "Please select a scheduled date and time.",
+      );
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setError("");
+
+      const body = {
         title: cleanTitle,
-        description: description.trim(),
-        thumbnail: "/images/home/live-tv.jpg",
-        category,
-        status,
-        language,
-        duration: duration.trim() || "0:00",
-        views: 0,
-        publishedAt:
-          status === "Published"
-            ? "Just now"
-            : status === "Scheduled"
-              ? "Scheduled"
-              : "—",
-        featured,
-        videoUrl: videoUrl.trim(),
+        description:
+          cleanDescription ||
+          null,
+        language:
+          mapLanguageToApi(
+            language,
+          ),
+        status:
+          mapStatusToApi(status),
+        categoryId:
+          categoryId || null,
+        thumbnailId:
+          thumbnailId || null,
+        videoUrl:
+          cleanVideoUrl,
+        duration:
+          durationSeconds,
+        isFeatured:
+          featured,
+        scheduledAt:
+          status === "Scheduled"
+            ? new Date(
+                scheduledAt,
+              ).toISOString()
+            : null,
       };
 
-      setVideos((current) => [
-        newVideo,
-        ...current,
-      ]);
-    }
+      let response: Response;
 
-    closeModal();
+      if (editingVideo) {
+        response = await fetch(
+          "/api/admin/videos",
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              id: editingVideo.id,
+              ...body,
+            }),
+          },
+        );
+      } else {
+        response = await fetch(
+          "/api/admin/videos",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify(body),
+          },
+        );
+      }
+
+      const data =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        throw new Error(
+          data.message ||
+            "Failed to save video.",
+        );
+      }
+
+      await loadData();
+
+      setShowAddModal(false);
+      resetForm();
+    } catch (saveError) {
+      console.error(
+        "Failed to save video:",
+        saveError,
+      );
+
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Failed to save video.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const deleteVideo = (id: number) => {
-    const video = videos.find(
-      (item) => item.id === id
-    );
+  const deleteVideo = async (
+    id: string,
+  ) => {
+    const video =
+      videos.find(
+        (item: VideoItem) =>
+          item.id === id,
+      );
 
-    if (!video) return;
+    if (!video) {
+      return;
+    }
 
-    const confirmed = window.confirm(
-      `Delete "${video.title}"?`
-    );
+    const confirmed =
+      window.confirm(
+        `Delete "${video.title}"?`,
+      );
 
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
 
-    setVideos((current) =>
-      current.filter((item) => item.id !== id)
-    );
+    try {
+      setError("");
 
-    if (selectedVideo?.id === id) {
-      setSelectedVideo(null);
+      const response =
+        await fetch(
+          `/api/admin/videos?id=${encodeURIComponent(
+            id,
+          )}`,
+          {
+            method: "DELETE",
+          },
+        );
+
+      const data =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        throw new Error(
+          data.message ||
+            "Failed to delete video.",
+        );
+      }
+
+      setVideos(
+        (
+          current: VideoItem[],
+        ) =>
+          current.filter(
+            (item: VideoItem) =>
+              item.id !== id,
+          ),
+      );
+
+      if (
+        selectedVideo?.id ===
+        id
+      ) {
+        setSelectedVideo(null);
+      }
+    } catch (deleteError) {
+      console.error(
+        "Failed to delete video:",
+        deleteError,
+      );
+
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Failed to delete video.",
+      );
     }
   };
 
-  const formatViews = (views: number) => {
-    if (views >= 1000000) {
-      return `${(views / 1000000).toFixed(1)}M`;
-    }
+  const changeVideoStatus =
+    async (
+      video: VideoItem,
+      nextStatus: VideoStatus,
+    ) => {
+      try {
+        setError("");
 
-    if (views >= 1000) {
-      return `${(views / 1000).toFixed(
-        views >= 10000 ? 0 : 1
-      )}K`;
-    }
+        const response =
+          await fetch(
+            "/api/admin/videos",
+            {
+              method: "PATCH",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+              body: JSON.stringify({
+                id: video.id,
+                status:
+                  mapStatusToApi(
+                    nextStatus,
+                  ),
+              }),
+            },
+          );
 
-    return String(views);
-  };
+        const data =
+          await response.json();
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+          throw new Error(
+            data.message ||
+              "Failed to update video status.",
+          );
+        }
+
+        await loadData();
+
+        if (
+          selectedVideo?.id ===
+          video.id &&
+          data.video
+        ) {
+          const refreshed =
+            mapApiVideo({
+              id:
+                data.video.id,
+              slug:
+                data.video.slug,
+              title:
+                data.video.title,
+              description:
+                data.video
+                  .description ??
+                null,
+              language:
+                data.video.language,
+              status:
+                data.video.status,
+              categoryId:
+                data.video
+                  .categoryId ??
+                null,
+              categoryName:
+                data.video
+                  .categoryName ??
+                null,
+              thumbnailId:
+                data.video
+                  .thumbnailId ??
+                null,
+              thumbnailUrl:
+                data.video
+                  .thumbnailUrl ??
+                null,
+              videoUrl:
+                data.video.videoUrl,
+              duration:
+                data.video.duration ??
+                null,
+              views:
+                data.video.views ??
+                0,
+              isFeatured:
+                data.video
+                  .isFeatured ===
+                true,
+              publishedAt:
+                data.video
+                  .publishedAt ??
+                null,
+              scheduledAt:
+                data.video
+                  .scheduledAt ??
+                null,
+            });
+
+          setSelectedVideo(
+            refreshed,
+          );
+        }
+      } catch (statusError) {
+        console.error(
+          "Failed to update video status:",
+          statusError,
+        );
+
+        setError(
+          statusError instanceof Error
+            ? statusError.message
+            : "Failed to update video status.",
+        );
+      }
+    };
 
   return (
     <div className="space-y-6">
@@ -381,8 +1302,8 @@ export default function VideosPage() {
           </h1>
 
           <p className="mt-1 text-sm text-slate-500">
-            Manage TV SUPREME video news, programmes and
-            featured videos.
+            Manage TV SUPREME video news,
+            programmes and featured videos.
           </p>
         </div>
 
@@ -396,41 +1317,61 @@ export default function VideosPage() {
         </button>
       </div>
 
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       {/* =========================================================
           STATS
       ========================================================== */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <VideoStatCard
           title="Total Videos"
-          value={String(totalVideos)}
+          value={String(
+            totalVideos,
+          )}
           note="All videos"
           icon={<Video size={20} />}
         />
 
         <VideoStatCard
           title="Published"
-          value={String(publishedCount)}
+          value={String(
+            publishedCount,
+          )}
           note="Currently live"
-          icon={<CheckCircle2 size={20} />}
+          icon={
+            <CheckCircle2 size={20} />
+          }
         />
 
         <VideoStatCard
           title="Drafts"
-          value={String(draftCount)}
+          value={String(
+            draftCount,
+          )}
           note="Being prepared"
-          icon={<FileVideo size={20} />}
+          icon={
+            <FileVideo size={20} />
+          }
         />
 
         <VideoStatCard
           title="Review"
-          value={String(reviewCount)}
+          value={String(
+            reviewCount,
+          )}
           note="Waiting for approval"
           icon={<Clock3 size={20} />}
         />
 
         <VideoStatCard
           title="Total Views"
-          value={formatViews(totalViews)}
+          value={formatViews(
+            totalViews,
+          )}
           note="Across all videos"
           icon={<Eye size={20} />}
         />
@@ -439,11 +1380,9 @@ export default function VideosPage() {
       {/* =========================================================
           MAIN CONTENT
       ========================================================== */}
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        {/* Toolbar */}
+      <section className="overflow-visible rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 p-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            {/* Search */}
             <div className="relative w-full xl:max-w-md">
               <Search
                 size={18}
@@ -454,28 +1393,39 @@ export default function VideosPage() {
                 type="search"
                 value={search}
                 onChange={(event) =>
-                  setSearch(event.target.value)
+                  setSearch(
+                    event.target.value,
+                  )
                 }
                 placeholder="Search videos..."
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-pink-400 focus:bg-white"
               />
             </div>
 
-            {/* Filters */}
             <div className="flex flex-wrap gap-2">
               <div className="relative">
                 <select
-                  value={categoryFilter}
+                  value={
+                    categoryFilter
+                  }
                   onChange={(event) =>
-                    setCategoryFilter(event.target.value)
+                    setCategoryFilter(
+                      event.target
+                        .value,
+                    )
                   }
                   className="appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 pr-9 text-sm font-medium text-slate-600 outline-none transition focus:border-pink-400"
                 >
-                  {categories.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
+                  {categoryNames.map(
+                    (item: string) => (
+                      <option
+                        key={item}
+                        value={item}
+                      >
+                        {item}
+                      </option>
+                    ),
+                  )}
                 </select>
 
                 <ChevronDown
@@ -484,34 +1434,61 @@ export default function VideosPage() {
                 />
               </div>
 
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
-              >
-                Latest
-                <ChevronDown size={15} />
-              </button>
+              <div className="relative">
+                <select
+                  value={sortOrder}
+                  onChange={(event) =>
+                    setSortOrder(
+                      event.target
+                        .value as
+                        | "latest"
+                        | "oldest"
+                        | "name",
+                    )
+                  }
+                  className="appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 pr-9 text-sm font-medium text-slate-600 outline-none transition focus:border-pink-400"
+                >
+                  <option value="latest">
+                    Latest
+                  </option>
+                  <option value="oldest">
+                    Oldest
+                  </option>
+                  <option value="name">
+                    Name
+                  </option>
+                </select>
+
+                <ChevronDown
+                  size={15}
+                  className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Status tabs */}
           <div className="mt-5 flex gap-1 overflow-x-auto border-b border-slate-100">
-            {statusFilters.map((filter) => (
-              <button
-                key={filter.value}
-                type="button"
-                onClick={() =>
-                  setStatusFilter(filter.value)
-                }
-                className={`whitespace-nowrap border-b-2 px-4 py-3 text-sm font-semibold transition ${
-                  statusFilter === filter.value
-                    ? "border-pink-600 text-pink-600"
-                    : "border-transparent text-slate-500 hover:border-pink-200 hover:text-pink-600"
-                }`}
-              >
-                {filter.label}
-              </button>
-            ))}
+            {statusFilters.map(
+              (filter) => (
+                <button
+                  key={filter.value}
+                  type="button"
+                  onClick={() =>
+                    setStatusFilter(
+                      filter.value,
+                    )
+                  }
+                  className={`whitespace-nowrap border-b-2 px-4 py-3 text-sm font-semibold transition ${
+                    statusFilter ===
+                    filter.value
+                      ? "border-pink-600 text-pink-600"
+                      : "border-transparent text-slate-500 hover:border-pink-200 hover:text-pink-600"
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ),
+            )}
           </div>
         </div>
 
@@ -553,142 +1530,255 @@ export default function VideosPage() {
             </thead>
 
             <tbody>
-              {filteredVideos.length > 0 ? (
-                filteredVideos.map((video) => (
-                  <tr
-                    key={video.id}
-                    className="border-b border-slate-100 transition hover:bg-slate-50/70"
+              {isLoading ? (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="px-6 py-16 text-center"
                   >
-                    {/* Video */}
-                    <td className="px-5 py-4">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSelectedVideo(video)
-                        }
-                        className="flex max-w-[430px] items-center gap-3 text-left"
-                      >
-                        <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-xl bg-slate-900">
-                          <img
-                            src={video.thumbnail}
-                            alt={video.title}
-                            className="h-full w-full object-cover"
-                          />
+                    <div className="flex flex-col items-center">
+                      <Loader2
+                        size={34}
+                        className="animate-spin text-pink-600"
+                      />
 
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white">
-                              <Play
-                                size={12}
-                                fill="currentColor"
-                              />
+                      <p className="mt-4 text-sm font-semibold text-slate-700">
+                        Loading videos...
+                      </p>
+
+                      <p className="mt-1 text-xs text-slate-400">
+                        Loading video records
+                        from the CMS.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredVideos.length >
+                0 ? (
+                filteredVideos.map(
+                  (video: VideoItem) => (
+                    <tr
+                      key={video.id}
+                      className="border-b border-slate-100 transition hover:bg-slate-50/70"
+                    >
+                      <td className="px-5 py-4">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedVideo(
+                              video,
+                            )
+                          }
+                          className="flex max-w-[430px] items-center gap-3 text-left"
+                        >
+                          <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-xl bg-slate-900">
+                            <img
+                              src={
+                                video.thumbnail
+                              }
+                              alt={
+                                video.title
+                              }
+                              className="h-full w-full object-cover"
+                            />
+
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white">
+                                <Play
+                                  size={12}
+                                  fill="currentColor"
+                                />
+                              </span>
+                            </div>
+
+                            <span className="absolute bottom-1.5 right-1.5 rounded bg-black/75 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                              {
+                                video.duration
+                              }
                             </span>
                           </div>
 
-                          <span className="absolute bottom-1.5 right-1.5 rounded bg-black/75 px-1.5 py-0.5 text-[9px] font-bold text-white">
-                            {video.duration}
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-slate-800">
+                              {
+                                video.title
+                              }
+                            </p>
+
+                            <p className="mt-1 truncate text-xs text-slate-400">
+                              {
+                                video.language
+                              }{" "}
+                              ·{" "}
+                              {
+                                video.duration
+                              }
+                            </p>
+                          </div>
+                        </button>
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <span className="text-sm font-medium text-slate-600">
+                          {
+                            video.category
+                          }
+                        </span>
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <StatusBadge
+                          status={
+                            video.status
+                          }
+                        />
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <span className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600">
+                          <Eye
+                            size={14}
+                          />
+                          {formatViews(
+                            video.views,
+                          )}
+                        </span>
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <span className="text-sm text-slate-500">
+                          {video.status ===
+                          "Scheduled"
+                            ? video.scheduledAt
+                            : video.publishedAt}
+                        </span>
+                      </td>
+
+                      <td className="px-5 py-4">
+                        {video.featured ? (
+                          <span className="inline-flex rounded-full bg-pink-50 px-2.5 py-1 text-xs font-semibold text-pink-700">
+                            Featured
                           </span>
+                        ) : (
+                          <span className="text-xs text-slate-400">
+                            —
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openEditModal(
+                                video,
+                              )
+                            }
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-pink-50 hover:text-pink-600"
+                            aria-label={`Edit ${video.title}`}
+                          >
+                            <Edit3
+                              size={15}
+                            />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedVideo(
+                                video,
+                              )
+                            }
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                            aria-label={`View ${video.title}`}
+                          >
+                            <Eye
+                              size={15}
+                            />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void deleteVideo(
+                                video.id,
+                              )
+                            }
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                            aria-label={`Delete ${video.title}`}
+                          >
+                            <Trash2
+                              size={15}
+                            />
+                          </button>
+
+                          <div className="group relative">
+                            <button
+                              type="button"
+                              className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-300 transition hover:bg-slate-100 hover:text-slate-700"
+                              aria-label={`More actions for ${video.title}`}
+                            >
+                              <MoreHorizontal
+                                size={15}
+                              />
+                            </button>
+
+                            <div className="invisible absolute right-0 top-10 z-30 w-40 rounded-xl border border-slate-200 bg-white p-1.5 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100">
+                              {video.status !==
+                                "Published" && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void changeVideoStatus(
+                                      video,
+                                      "Published",
+                                    )
+                                  }
+                                  className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+                                >
+                                  Publish
+                                </button>
+                              )}
+
+                              {video.status !==
+                                "Draft" && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void changeVideoStatus(
+                                      video,
+                                      "Draft",
+                                    )
+                                  }
+                                  className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                                >
+                                  Move to Draft
+                                </button>
+                              )}
+
+                              {video.status !==
+                                "Archived" && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void changeVideoStatus(
+                                      video,
+                                      "Archived",
+                                    )
+                                  }
+                                  className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                                >
+                                  Archive
+                                </button>
+                              )}
+                            </div>
+                          </div>
                         </div>
-
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-slate-800">
-                            {video.title}
-                          </p>
-
-                          <p className="mt-1 truncate text-xs text-slate-400">
-                            {video.language} ·{" "}
-                            {video.duration}
-                          </p>
-                        </div>
-                      </button>
-                    </td>
-
-                    {/* Category */}
-                    <td className="px-5 py-4">
-                      <span className="text-sm font-medium text-slate-600">
-                        {video.category}
-                      </span>
-                    </td>
-
-                    {/* Status */}
-                    <td className="px-5 py-4">
-                      <StatusBadge status={video.status} />
-                    </td>
-
-                    {/* Views */}
-                    <td className="px-5 py-4">
-                      <span className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600">
-                        <Eye size={14} />
-                        {formatViews(video.views)}
-                      </span>
-                    </td>
-
-                    {/* Published */}
-                    <td className="px-5 py-4">
-                      <span className="text-sm text-slate-500">
-                        {video.publishedAt}
-                      </span>
-                    </td>
-
-                    {/* Featured */}
-                    <td className="px-5 py-4">
-                      {video.featured ? (
-                        <span className="inline-flex rounded-full bg-pink-50 px-2.5 py-1 text-xs font-semibold text-pink-700">
-                          Featured
-                        </span>
-                      ) : (
-                        <span className="text-xs text-slate-400">
-                          —
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            openEditModal(video)
-                          }
-                          className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-pink-50 hover:text-pink-600"
-                          aria-label={`Edit ${video.title}`}
-                        >
-                          <Edit3 size={15} />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSelectedVideo(video)
-                          }
-                          className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                          aria-label={`View ${video.title}`}
-                        >
-                          <Eye size={15} />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            deleteVideo(video.id)
-                          }
-                          className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600"
-                          aria-label={`Delete ${video.title}`}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-
-                        <button
-                          type="button"
-                          className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-300 transition hover:bg-slate-100 hover:text-slate-700"
-                          aria-label={`More actions for ${video.title}`}
-                        >
-                          <MoreHorizontal size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                    </tr>
+                  ),
+                )
               ) : (
                 <tr>
                   <td
@@ -708,8 +1798,9 @@ export default function VideosPage() {
                       </h3>
 
                       <p className="mt-1 text-sm text-slate-400">
-                        Try another search or create a new
-                        video.
+                        Try another search,
+                        filter or create a
+                        new video.
                       </p>
                     </div>
                   </td>
@@ -719,15 +1810,18 @@ export default function VideosPage() {
           </table>
         </div>
 
-        {/* Footer */}
         <div className="flex flex-col gap-2 border-t border-slate-100 bg-slate-50/60 px-5 py-4 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
           <span>
-            Showing {filteredVideos.length} of{" "}
-            {videos.length} videos
+            Showing{" "}
+            {
+              filteredVideos.length
+            }{" "}
+            of {videos.length} videos
           </span>
 
           <span>
-            Video records are currently local UI data.
+            Video records are stored in
+            PostgreSQL.
           </span>
         </div>
       </section>
@@ -744,13 +1838,16 @@ export default function VideosPage() {
               </h2>
 
               <p className="mt-1 text-sm text-slate-500">
-                Preview and manage the selected video.
+                Preview and manage the selected
+                video.
               </p>
             </div>
 
             <button
               type="button"
-              onClick={() => setSelectedVideo(null)}
+              onClick={() =>
+                setSelectedVideo(null)
+              }
               className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
               aria-label="Close video details"
             >
@@ -759,12 +1856,15 @@ export default function VideosPage() {
           </div>
 
           <div className="grid gap-6 p-5 lg:grid-cols-[360px_minmax(0,1fr)]">
-            {/* Preview */}
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-black">
               <div className="relative aspect-video">
                 <img
-                  src={selectedVideo.thumbnail}
-                  alt={selectedVideo.title}
+                  src={
+                    selectedVideo.thumbnail
+                  }
+                  alt={
+                    selectedVideo.title
+                  }
                   className="h-full w-full object-cover opacity-80"
                 />
 
@@ -778,12 +1878,13 @@ export default function VideosPage() {
                 </div>
 
                 <span className="absolute bottom-3 right-3 rounded bg-black/75 px-2 py-1 text-xs font-bold text-white">
-                  {selectedVideo.duration}
+                  {
+                    selectedVideo.duration
+                  }
                 </span>
               </div>
             </div>
 
-            {/* Details */}
             <div className="space-y-5">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
@@ -791,7 +1892,9 @@ export default function VideosPage() {
                 </p>
 
                 <h3 className="mt-1 text-xl font-bold text-slate-900">
-                  {selectedVideo.title}
+                  {
+                    selectedVideo.title
+                  }
                 </h3>
               </div>
 
@@ -803,23 +1906,29 @@ export default function VideosPage() {
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <DetailItem
                   label="Category"
-                  value={selectedVideo.category}
+                  value={
+                    selectedVideo.category
+                  }
                 />
 
                 <DetailItem
                   label="Language"
-                  value={selectedVideo.language}
+                  value={
+                    selectedVideo.language
+                  }
                 />
 
                 <DetailItem
                   label="Status"
-                  value={selectedVideo.status}
+                  value={
+                    selectedVideo.status
+                  }
                 />
 
                 <DetailItem
                   label="Views"
                   value={formatViews(
-                    selectedVideo.views
+                    selectedVideo.views,
                   )}
                 />
               </div>
@@ -828,7 +1937,9 @@ export default function VideosPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    openEditModal(selectedVideo)
+                    openEditModal(
+                      selectedVideo,
+                    )
                   }
                   className="inline-flex items-center gap-2 rounded-xl bg-pink-50 px-4 py-2.5 text-sm font-semibold text-pink-600 transition hover:bg-pink-100"
                 >
@@ -836,10 +1947,26 @@ export default function VideosPage() {
                   Edit Video
                 </button>
 
+                {selectedVideo.videoUrl && (
+                  <a
+                    href={
+                      selectedVideo.videoUrl
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                  >
+                    <Play size={16} />
+                    Open Video
+                  </a>
+                )}
+
                 <button
                   type="button"
                   onClick={() => {
-                    setSelectedVideo(null);
+                    setSelectedVideo(
+                      null,
+                    );
                     openAddModal();
                   }}
                   className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
@@ -851,7 +1978,9 @@ export default function VideosPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    deleteVideo(selectedVideo.id)
+                    void deleteVideo(
+                      selectedVideo.id,
+                    )
                   }
                   className="inline-flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-100"
                 >
@@ -870,7 +1999,6 @@ export default function VideosPage() {
       {showAddModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
           <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
-            {/* Header */}
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-5">
               <div>
                 <p className="text-sm font-medium text-pink-600">
@@ -887,14 +2015,14 @@ export default function VideosPage() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                disabled={isSaving}
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
                 aria-label="Close"
               >
                 <X size={19} />
               </button>
             </div>
 
-            {/* Form */}
             <div className="space-y-5 p-6">
               <div>
                 <label
@@ -912,7 +2040,9 @@ export default function VideosPage() {
                   type="text"
                   value={title}
                   onChange={(event) =>
-                    setTitle(event.target.value)
+                    setTitle(
+                      event.target.value,
+                    )
                   }
                   placeholder="Enter video title..."
                   className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-pink-400 focus:ring-4 focus:ring-pink-50"
@@ -933,7 +2063,8 @@ export default function VideosPage() {
                   value={description}
                   onChange={(event) =>
                     setDescription(
-                      event.target.value
+                      event.target
+                        .value,
                     )
                   }
                   placeholder="Describe the video..."
@@ -953,25 +2084,35 @@ export default function VideosPage() {
                   <div className="relative">
                     <select
                       id="videoCategory"
-                      value={category}
+                      value={categoryId}
                       onChange={(event) =>
-                        setCategory(event.target.value)
+                        setCategoryId(
+                          event.target
+                            .value,
+                        )
                       }
                       className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 outline-none focus:border-pink-400"
                     >
-                      {categories
-                        .filter(
-                          (item) =>
-                            item !== "All Categories"
-                        )
-                        .map((item) => (
+                      <option value="">
+                        Select category
+                      </option>
+
+                      {categories.map(
+                        (
+                          item: CategoryOption,
+                        ) => (
                           <option
-                            key={item}
-                            value={item}
+                            key={item.id}
+                            value={
+                              item.id
+                            }
                           >
-                            {item}
+                            {
+                              item.name
+                            }
                           </option>
-                        ))}
+                        ),
+                      )}
                     </select>
 
                     <ChevronDown
@@ -994,7 +2135,10 @@ export default function VideosPage() {
                       id="videoLanguage"
                       value={language}
                       onChange={(event) =>
-                        setLanguage(event.target.value)
+                        setLanguage(
+                          event.target
+                            .value as LanguageLabel,
+                        )
                       }
                       className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 outline-none focus:border-pink-400"
                     >
@@ -1033,11 +2177,18 @@ export default function VideosPage() {
                     type="text"
                     value={duration}
                     onChange={(event) =>
-                      setDuration(event.target.value)
+                      setDuration(
+                        event.target
+                          .value,
+                      )
                     }
                     placeholder="e.g. 4:12"
                     className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none focus:border-pink-400"
                   />
+
+                  <p className="mt-1 text-xs text-slate-400">
+                    Use MM:SS format.
+                  </p>
                 </div>
 
                 <div>
@@ -1054,7 +2205,8 @@ export default function VideosPage() {
                       value={status}
                       onChange={(event) =>
                         setStatus(
-                          event.target.value as VideoStatus
+                          event.target
+                            .value as VideoStatus,
                         )
                       }
                       className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 outline-none focus:border-pink-400"
@@ -1088,12 +2240,49 @@ export default function VideosPage() {
                 </div>
               </div>
 
+              {status ===
+                "Scheduled" && (
+                <div>
+                  <label
+                    htmlFor="scheduledAt"
+                    className="mb-2 block text-sm font-semibold text-slate-700"
+                  >
+                    Schedule Date & Time
+                  </label>
+
+                  <div className="relative">
+                    <CalendarClock
+                      size={17}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+
+                    <input
+                      id="scheduledAt"
+                      type="datetime-local"
+                      value={
+                        scheduledAt
+                      }
+                      onChange={(event) =>
+                        setScheduledAt(
+                          event.target
+                            .value,
+                        )
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm text-slate-700 outline-none focus:border-pink-400"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label
                   htmlFor="videoUrl"
                   className="mb-2 block text-sm font-semibold text-slate-700"
                 >
                   Video URL
+                  <span className="ml-1 text-pink-600">
+                    *
+                  </span>
                 </label>
 
                 <input
@@ -1101,7 +2290,9 @@ export default function VideosPage() {
                   type="url"
                   value={videoUrl}
                   onChange={(event) =>
-                    setVideoUrl(event.target.value)
+                    setVideoUrl(
+                      event.target.value,
+                    )
                   }
                   placeholder="https://..."
                   className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-pink-400 focus:ring-4 focus:ring-pink-50"
@@ -1114,30 +2305,77 @@ export default function VideosPage() {
                   Thumbnail
                 </label>
 
-                <div className="flex min-h-[150px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-5 text-center">
-                  <div className="rounded-xl bg-white p-3 shadow-sm">
+                {thumbnails.length >
+                0 ? (
+                  <>
+                    <div className="grid max-h-[250px] grid-cols-3 gap-3 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-4">
+                      {thumbnails.map(
+                        (
+                          item: ThumbnailOption,
+                        ) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() =>
+                              setThumbnailId(
+                                item.id,
+                              )
+                            }
+                            className={`relative aspect-video overflow-hidden rounded-xl border-2 transition ${
+                              thumbnailId ===
+                              item.id
+                                ? "border-pink-500 ring-2 ring-pink-100"
+                                : "border-transparent hover:border-pink-200"
+                            }`}
+                            title={
+                              item.name
+                            }
+                          >
+                            <img
+                              src={
+                                item.url
+                              }
+                              alt={
+                                item.name
+                              }
+                              className="h-full w-full object-cover"
+                            />
+
+                            {thumbnailId ===
+                              item.id && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-pink-600/20">
+                                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-600 text-white">
+                                  ✓
+                                </span>
+                              </div>
+                            )}
+                          </button>
+                        ),
+                      )}
+                    </div>
+
+                    <p className="mt-2 text-xs text-slate-400">
+                      Select an image from the
+                      Media Library.
+                    </p>
+                  </>
+                ) : (
+                  <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-6 text-center">
                     <FileVideo
-                      size={24}
-                      className="text-pink-600"
+                      size={26}
+                      className="mx-auto text-slate-300"
                     />
+
+                    <p className="mt-2 text-sm font-semibold text-slate-600">
+                      No image media available
+                    </p>
+
+                    <p className="mt-1 text-xs text-slate-400">
+                      Upload an image in Media
+                      Library first.
+                    </p>
                   </div>
-
-                  <p className="mt-3 text-sm font-semibold text-slate-700">
-                    Upload video thumbnail
-                  </p>
-
-                  <p className="mt-1 text-xs text-slate-400">
-                    Thumbnail management will connect to
-                    Media Library later.
-                  </p>
-
-                  <button
-                    type="button"
-                    className="mt-4 rounded-xl bg-pink-50 px-4 py-2 text-xs font-semibold text-pink-600 hover:bg-pink-100"
-                  >
-                    Choose Image
-                  </button>
-                </div>
+                )}
               </div>
 
               {/* Featured */}
@@ -1149,17 +2387,21 @@ export default function VideosPage() {
                     </p>
 
                     <p className="mt-1 text-xs leading-5 text-slate-400">
-                      Highlight this video in the public
-                      Featured Videos section.
+                      Highlight this video in the
+                      public Featured Videos section.
                     </p>
                   </div>
 
                   <button
                     type="button"
                     role="switch"
-                    aria-checked={featured}
+                    aria-checked={
+                      featured
+                    }
                     onClick={() =>
-                      setFeatured(!featured)
+                      setFeatured(
+                        !featured,
+                      )
                     }
                     className={`relative h-6 w-11 shrink-0 rounded-full transition ${
                       featured
@@ -1184,22 +2426,39 @@ export default function VideosPage() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+                disabled={isSaving}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
               >
                 Cancel
               </button>
 
               <button
                 type="button"
-                onClick={saveVideo}
-                disabled={!title.trim()}
+                onClick={() =>
+                  void saveVideo()
+                }
+                disabled={
+                  isSaving ||
+                  !title.trim()
+                }
                 className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <Video size={16} />
-
-                {editingVideo
-                  ? "Save Changes"
-                  : "Add Video"}
+                {isSaving ? (
+                  <>
+                    <Loader2
+                      size={16}
+                      className="animate-spin"
+                    />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Video size={16} />
+                    {editingVideo
+                      ? "Save Changes"
+                      : "Add Video"}
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -1211,7 +2470,7 @@ export default function VideosPage() {
 
 /* ===============================================================
    STAT CARD
-================================================================ */
+=============================================================== */
 
 function VideoStatCard({
   title,
@@ -1251,19 +2510,27 @@ function VideoStatCard({
 
 /* ===============================================================
    STATUS BADGE
-================================================================ */
+=============================================================== */
 
 function StatusBadge({
   status,
 }: {
   status: VideoStatus;
 }) {
-  const styles: Record<VideoStatus, string> = {
-    Draft: "bg-slate-100 text-slate-600",
-    Review: "bg-amber-50 text-amber-700",
-    Scheduled: "bg-purple-50 text-purple-700",
-    Published: "bg-emerald-50 text-emerald-700",
-    Archived: "bg-slate-100 text-slate-500",
+  const styles: Record<
+    VideoStatus,
+    string
+  > = {
+    Draft:
+      "bg-slate-100 text-slate-600",
+    Review:
+      "bg-amber-50 text-amber-700",
+    Scheduled:
+      "bg-purple-50 text-purple-700",
+    Published:
+      "bg-emerald-50 text-emerald-700",
+    Archived:
+      "bg-slate-100 text-slate-500",
   };
 
   return (
@@ -1277,7 +2544,7 @@ function StatusBadge({
 
 /* ===============================================================
    DETAIL ITEM
-================================================================ */
+=============================================================== */
 
 function DetailItem({
   label,

@@ -4,19 +4,6 @@ import CategoryPage from "@/components/category/CategoryPage";
 import { getArticles } from "@/lib/data/articles";
 import { getCategories } from "@/lib/data/categories";
 
-const validSlugs = [
-  "latest",
-  "sri-lanka",
-  "world",
-  "politics",
-  "business",
-  "sports",
-  "entertainment",
-  "technology",
-  "lifestyle",
-  "video",
-];
-
 type PageProps = {
   params: Promise<{
     locale: string;
@@ -45,21 +32,11 @@ export default async function CategoryRoute({
 }: PageProps) {
   const { locale, slug } = await params;
 
-  if (!validSlugs.includes(slug)) {
-    notFound();
-  }
-
   const language = getLanguage(locale);
 
   /*
-   * Load the categories from PostgreSQL.
-   */
-  const categories =
-    await getCategories(language);
-
-  /*
-   * "latest" is not a database category.
-   * It means all published articles.
+   * "latest" is a special route and is not a
+   * database category.
    */
   if (slug === "latest") {
     const result = await getArticles({
@@ -71,27 +48,31 @@ export default async function CategoryRoute({
 
     return (
       <CategoryPage
-        categorySlug={slug}
+        categorySlug="latest"
         initialArticles={result.articles}
       />
     );
   }
 
   /*
-   * Find the requested category in PostgreSQL.
+   * All other category routes are resolved directly
+   * from PostgreSQL.
    */
+  const categories =
+    await getCategories(language);
+
   const category = categories.find(
     (item) => item.slug === slug,
   );
 
+  /*
+   * If the category does not exist in PostgreSQL
+   * for the requested language, return 404.
+   */
   if (!category) {
     notFound();
   }
 
-  /*
-   * Load only PUBLISHED articles for
-   * the selected category.
-   */
   const result = await getArticles({
     language,
     status: "PUBLISHED",
@@ -102,7 +83,7 @@ export default async function CategoryRoute({
 
   return (
     <CategoryPage
-      categorySlug={slug}
+      categorySlug={category.slug}
       initialArticles={result.articles}
     />
   );

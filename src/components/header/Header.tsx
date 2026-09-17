@@ -4,7 +4,6 @@ import {
   Search,
   Sun,
   Moon,
-  Music2,
   Play,
   Menu,
   X,
@@ -18,115 +17,362 @@ import {
   Cpu,
   Leaf,
   Video,
+  Music2,
 } from "lucide-react";
 
-import { FormEvent, useEffect, useState } from "react";
+import {
+  FormEvent,
+  ReactNode,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import { useTheme } from "@/components/common/ThemeProvider";
 import { Link } from "@/i18n/navigation";
+import { usePathname } from "next/navigation";
 
 /* =========================================================
-   NAVIGATION
+   TYPES
 ========================================================= */
 
-const navigation = [
-  {
-    name: "Home",
-    href: "/",
-    icon: House,
+type Locale = "en" | "si" | "ta";
+
+type SupportedLanguage = "EN" | "SI" | "TA";
+
+type MenuType =
+  | "Page"
+  | "Category"
+  | "Custom Link"
+  | "System";
+
+type HeaderMenuItem = {
+  id: string;
+  language: SupportedLanguage;
+  label: string;
+  href: string;
+  position: number;
+  isVisible: boolean;
+  type: MenuType;
+  desktop: boolean;
+  mobile: boolean;
+  openNewTab: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type HeaderSiteConfig = {
+  logoUrl: string;
+  tagline: string;
+
+  social: {
+    facebook: string;
+    youtube: string;
+    instagram: string;
+    tiktok: string;
+  };
+};
+
+type HeaderApiResponse = {
+  success: boolean;
+  language: SupportedLanguage;
+  menu: HeaderMenuItem[];
+  site: HeaderSiteConfig;
+};
+
+/* =========================================================
+   FALLBACK CONFIG
+========================================================= */
+
+const fallbackSiteConfig: HeaderSiteConfig = {
+  logoUrl: "/logo.png",
+  tagline: "NEWS • PEOPLE • A BRIGHTER TOMORROW",
+
+  social: {
+    facebook: "",
+    youtube: "",
+    instagram: "",
+    tiktok: "",
   },
-  {
-    name: "Latest",
-    href: "/latest",
-    icon: Newspaper,
-  },
-  {
-    name: "Sri Lanka",
-    href: "/sri-lanka",
-    icon: House,
-  },
-  {
-    name: "World",
-    href: "/world",
-    icon: Globe2,
-  },
-  {
-    name: "Politics",
-    href: "/politics",
-    icon: Landmark,
-  },
-  {
-    name: "Business",
-    href: "/business",
-    icon: Briefcase,
-  },
-  {
-    name: "Sports",
-    href: "/sports",
-    icon: Trophy,
-  },
-  {
-    name: "Entertainment",
-    href: "/entertainment",
-    icon: Clapperboard,
-  },
-  {
-    name: "Technology",
-    href: "/technology",
-    icon: Cpu,
-  },
-  {
-    name: "Lifestyle",
-    href: "/lifestyle",
-    icon: Leaf,
-  },
-  {
-    name: "Video",
-    href: "/video",
-    icon: Video,
-  },
-];
+};
+
+/* =========================================================
+   LANGUAGE HELPERS
+========================================================= */
+
+function getLocaleFromPath(
+  pathname: string
+): Locale {
+  const match = pathname.match(
+    /^\/(en|si|ta)(?=\/|$)/
+  );
+
+  if (match?.[1] === "si") {
+    return "si";
+  }
+
+  if (match?.[1] === "ta") {
+    return "ta";
+  }
+
+  return "en";
+}
+
+function getApiLanguage(
+  locale: Locale
+): SupportedLanguage {
+  switch (locale) {
+    case "si":
+      return "SI";
+
+    case "ta":
+      return "TA";
+
+    default:
+      return "EN";
+  }
+}
+
+/* =========================================================
+   URL HELPERS
+========================================================= */
+
+function normalizeInternalHref(
+  href: string
+): string {
+  const trimmed = href.trim();
+
+  if (!trimmed) {
+    return "/";
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  let normalized = trimmed;
+
+  if (!normalized.startsWith("/")) {
+    normalized = `/${normalized}`;
+  }
+
+  /*
+   * Remove locale prefix from Admin Menu URLs.
+   *
+   * /en/sports -> /sports
+   * /si/sports -> /sports
+   * /ta/sports -> /sports
+   */
+  normalized = normalized.replace(
+    /^\/(en|si|ta)(?=\/|$)/,
+    ""
+  );
+
+  return normalized || "/";
+}
+
+function isExternalUrl(
+  href: string
+): boolean {
+  return /^https?:\/\//i.test(
+    href.trim()
+  );
+}
+
+/* =========================================================
+   MENU ICONS
+========================================================= */
+
+function getMenuIcon(
+  href: string,
+  label: string
+) {
+  const normalizedHref =
+    normalizeInternalHref(
+      href
+    ).toLowerCase();
+
+  const normalizedLabel =
+    label.trim().toLowerCase();
+
+  if (
+    normalizedHref === "/" ||
+    normalizedLabel === "home"
+  ) {
+    return House;
+  }
+
+  if (
+    normalizedHref === "/latest" ||
+    normalizedLabel === "latest"
+  ) {
+    return Newspaper;
+  }
+
+  if (
+    normalizedHref === "/sri-lanka" ||
+    normalizedLabel === "sri lanka"
+  ) {
+    return House;
+  }
+
+  if (
+    normalizedHref === "/world" ||
+    normalizedLabel === "world"
+  ) {
+    return Globe2;
+  }
+
+  if (
+    normalizedHref === "/politics" ||
+    normalizedLabel === "politics"
+  ) {
+    return Landmark;
+  }
+
+  if (
+    normalizedHref === "/business" ||
+    normalizedLabel === "business"
+  ) {
+    return Briefcase;
+  }
+
+  if (
+    normalizedHref === "/sports" ||
+    normalizedLabel === "sports"
+  ) {
+    return Trophy;
+  }
+
+  if (
+    normalizedHref === "/entertainment" ||
+    normalizedLabel === "entertainment"
+  ) {
+    return Clapperboard;
+  }
+
+  if (
+    normalizedHref === "/technology" ||
+    normalizedLabel === "technology"
+  ) {
+    return Cpu;
+  }
+
+  if (
+    normalizedHref === "/lifestyle" ||
+    normalizedLabel === "lifestyle"
+  ) {
+    return Leaf;
+  }
+
+  if (
+    normalizedHref === "/video" ||
+    normalizedLabel === "video"
+  ) {
+    return Video;
+  }
+
+  return Menu;
+}
+
+/* =========================================================
+   WATCH LIVE
+========================================================= */
+
+function isWatchLiveItem(
+  item: HeaderMenuItem
+): boolean {
+  return (
+    normalizeInternalHref(
+      item.href
+    ) === "/watch-live"
+  );
+}
 
 /* =========================================================
    WEATHER
 ========================================================= */
 
-function getWeatherText(code: number) {
-  if (code === 0) return "Clear";
-  if (code === 1 || code === 2) return "Partly cloudy";
-  if (code === 3) return "Cloudy";
+function getWeatherText(
+  code: number
+): string {
+  if (code === 0) {
+    return "Clear";
+  }
 
-  if ([45, 48].includes(code)) {
+  if (
+    code === 1 ||
+    code === 2
+  ) {
+    return "Partly cloudy";
+  }
+
+  if (code === 3) {
+    return "Cloudy";
+  }
+
+  if (
+    code === 45 ||
+    code === 48
+  ) {
     return "Foggy";
   }
 
-  if ([51, 53, 55].includes(code)) {
+  if (
+    code === 51 ||
+    code === 53 ||
+    code === 55
+  ) {
     return "Drizzle";
   }
 
-  if ([61, 63, 65].includes(code)) {
+  if (
+    code === 61 ||
+    code === 63 ||
+    code === 65
+  ) {
     return "Rain";
   }
 
-  if ([71, 73, 75, 77].includes(code)) {
+  if (
+    code === 71 ||
+    code === 73 ||
+    code === 75 ||
+    code === 77
+  ) {
     return "Snow";
   }
 
-  if ([80, 81, 82].includes(code)) {
+  if (
+    code === 80 ||
+    code === 81 ||
+    code === 82
+  ) {
     return "Rain showers";
   }
 
-  if ([95, 96, 99].includes(code)) {
+  if (
+    code === 95 ||
+    code === 96 ||
+    code === 99
+  ) {
     return "Thunderstorm";
   }
 
   return "Weather";
 }
 
-function getWeatherIcon(code: number) {
-  if (code === 0) return "☀️";
+function getWeatherIcon(
+  code: number
+): string {
+  if (code === 0) {
+    return "☀️";
+  }
 
-  if (code === 1 || code === 2) {
+  if (
+    code === 1 ||
+    code === 2
+  ) {
     return "🌤️";
   }
 
@@ -134,17 +380,32 @@ function getWeatherIcon(code: number) {
     return "☁️";
   }
 
-  if ([45, 48].includes(code)) {
+  if (
+    code === 45 ||
+    code === 48
+  ) {
     return "🌫️";
   }
 
   if (
-    [51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)
+    code === 51 ||
+    code === 53 ||
+    code === 55 ||
+    code === 61 ||
+    code === 63 ||
+    code === 65 ||
+    code === 80 ||
+    code === 81 ||
+    code === 82
   ) {
     return "🌧️";
   }
 
-  if ([95, 96, 99].includes(code)) {
+  if (
+    code === 95 ||
+    code === 96 ||
+    code === 99
+  ) {
     return "⛈️";
   }
 
@@ -152,84 +413,318 @@ function getWeatherIcon(code: number) {
 }
 
 /* =========================================================
+   MENU LINK
+========================================================= */
+
+function MenuLink({
+  item,
+  children,
+  className,
+  onClick,
+}: {
+  item: HeaderMenuItem;
+  children: ReactNode;
+  className?: string;
+  onClick?: () => void;
+}) {
+  const href =
+    normalizeInternalHref(
+      item.href
+    );
+
+  /*
+   * External URL
+   */
+  if (isExternalUrl(href)) {
+    return (
+      <a
+        href={href}
+        target={
+          item.openNewTab
+            ? "_blank"
+            : undefined
+        }
+        rel={
+          item.openNewTab
+            ? "noopener noreferrer"
+            : undefined
+        }
+        className={className}
+        onClick={onClick}
+      >
+        {children}
+      </a>
+    );
+  }
+
+  /*
+   * Internal localized URL
+   */
+  return (
+    <Link
+      href={href}
+      className={className}
+      onClick={onClick}
+    >
+      {children}
+    </Link>
+  );
+}
+
+/* =========================================================
    HEADER
 ========================================================= */
 
 export default function Header() {
-  const { theme, toggleTheme } = useTheme();
+  const {
+    theme,
+    toggleTheme,
+  } = useTheme();
 
-  const [mobileMenuOpen, setMobileMenuOpen] =
-    useState(false);
+  const pathname =
+    usePathname() || "/";
 
-  const [searchQuery, setSearchQuery] =
-    useState("");
+  const locale =
+    getLocaleFromPath(pathname);
 
-  const [currentDate, setCurrentDate] =
-    useState("");
+  const language =
+    getApiLanguage(locale);
 
-  const [temperature, setTemperature] =
-    useState<number | null>(null);
+  /* =======================================================
+     STATE
+  ======================================================== */
 
-  const [weatherIcon, setWeatherIcon] =
-    useState("🌤️");
+  const [
+    mobileMenuOpen,
+    setMobileMenuOpen,
+  ] = useState(false);
 
-  const [weatherText, setWeatherText] =
-    useState("Loading weather...");
+  const [
+    searchQuery,
+    setSearchQuery,
+  ] = useState("");
 
-  const [weatherLoading, setWeatherLoading] =
-    useState(true);
+  const [
+    currentDate,
+    setCurrentDate,
+  ] = useState("");
 
-  const darkMode = theme === "dark";
+  const [
+    temperature,
+    setTemperature,
+  ] = useState<number | null>(
+    null
+  );
 
-  /* =========================================================
-     CURRENT DATE
-  ========================================================= */
+  const [
+    weatherIcon,
+    setWeatherIcon,
+  ] = useState("🌤️");
+
+  const [
+    weatherText,
+    setWeatherText,
+  ] = useState(
+    "Loading weather..."
+  );
+
+  const [
+    weatherLoading,
+    setWeatherLoading,
+  ] = useState(true);
+
+  const [
+    menuItems,
+    setMenuItems,
+  ] = useState<
+    HeaderMenuItem[]
+  >([]);
+
+  const [
+    siteConfig,
+    setSiteConfig,
+  ] = useState<HeaderSiteConfig>(
+    fallbackSiteConfig
+  );
+
+  const [
+    headerLoading,
+    setHeaderLoading,
+  ] = useState(true);
+
+  const darkMode =
+    theme === "dark";
+
+  /* =======================================================
+     LOAD HEADER CONFIG
+  ======================================================== */
+
+  useEffect(() => {
+    const controller =
+      new AbortController();
+
+    async function loadHeader() {
+      try {
+        setHeaderLoading(true);
+
+        const response =
+          await fetch(
+            `/api/public/header?language=${language}`,
+            {
+              method: "GET",
+              cache: "no-store",
+              signal:
+                controller.signal,
+            }
+          );
+
+        if (!response.ok) {
+          throw new Error(
+            "Header API request failed"
+          );
+        }
+
+        const data =
+          (await response.json()) as HeaderApiResponse;
+
+        if (
+          !data.success ||
+          !Array.isArray(
+            data.menu
+          )
+        ) {
+          throw new Error(
+            "Invalid header API response"
+          );
+        }
+
+        setMenuItems(
+          data.menu
+        );
+
+        if (data.site) {
+          setSiteConfig({
+            logoUrl:
+              data.site.logoUrl ||
+              fallbackSiteConfig.logoUrl,
+
+            tagline:
+              data.site.tagline ||
+              fallbackSiteConfig.tagline,
+
+            social: {
+              facebook:
+                data.site.social?.facebook ||
+                "",
+
+              youtube:
+                data.site.social?.youtube ||
+                "",
+
+              instagram:
+                data.site.social?.instagram ||
+                "",
+
+              tiktok:
+                data.site.social?.tiktok ||
+                "",
+            },
+          });
+        }
+      } catch (error) {
+        if (
+          error instanceof
+            DOMException &&
+          error.name ===
+            "AbortError"
+        ) {
+          return;
+        }
+
+        console.error(
+          "Failed to load header configuration:",
+          error
+        );
+      } finally {
+        if (
+          !controller.signal
+            .aborted
+        ) {
+          setHeaderLoading(
+            false
+          );
+        }
+      }
+    }
+
+    loadHeader();
+
+    return () => {
+      controller.abort();
+    };
+  }, [language]);
+
+  /* =======================================================
+     DATE
+  ======================================================== */
 
   useEffect(() => {
     const updateDate = () => {
-      const now = new Date();
+      const now =
+        new Date();
 
-      const formattedDate = new Intl.DateTimeFormat(
-        "en-GB",
-        {
-          weekday: "long",
-          day: "2-digit",
-          month: "long",
-          year: "numeric",
-          timeZone: "Asia/Colombo",
-        }
-      ).format(now);
+      const formattedDate =
+        new Intl.DateTimeFormat(
+          "en-GB",
+          {
+            weekday:
+              "long",
+            day: "2-digit",
+            month:
+              "long",
+            year: "numeric",
+            timeZone:
+              "Asia/Colombo",
+          }
+        ).format(now);
 
-      setCurrentDate(formattedDate);
+      setCurrentDate(
+        formattedDate
+      );
     };
 
     updateDate();
 
-    const interval = setInterval(
-      updateDate,
-      60 * 1000
-    );
+    const interval =
+      setInterval(
+        updateDate,
+        60 * 1000
+      );
 
-    return () => clearInterval(interval);
+    return () =>
+      clearInterval(interval);
   }, []);
 
-  /* =========================================================
-     CURRENT COLOMBO WEATHER
-  ========================================================= */
+  /* =======================================================
+     WEATHER
+  ======================================================== */
 
   useEffect(() => {
-    let cancelled = false;
+    let cancelled =
+      false;
 
     async function loadWeather() {
       try {
         setWeatherLoading(true);
 
-        const response = await fetch(
-          "https://api.open-meteo.com/v1/forecast?latitude=6.9271&longitude=79.8612&current=temperature_2m,weather_code&timezone=Asia%2FColombo",
-          {
-            cache: "no-store",
-          }
-        );
+        const response =
+          await fetch(
+            "https://api.open-meteo.com/v1/forecast?latitude=6.9271&longitude=79.8612&current=temperature_2m,weather_code&timezone=Asia%2FColombo",
+            {
+              cache:
+                "no-store",
+            }
+          );
 
         if (!response.ok) {
           throw new Error(
@@ -237,42 +732,63 @@ export default function Header() {
           );
         }
 
-        const data = await response.json();
+        const data =
+          await response.json();
 
-        if (cancelled) return;
+        if (cancelled) {
+          return;
+        }
 
         const temp =
-          data?.current?.temperature_2m;
+          data?.current
+            ?.temperature_2m;
 
         const code =
-          data?.current?.weather_code;
+          data?.current
+            ?.weather_code;
 
-        if (typeof temp === "number") {
+        if (
+          typeof temp ===
+          "number"
+        ) {
           setTemperature(
             Math.round(temp)
           );
         }
 
-        if (typeof code === "number") {
+        if (
+          typeof code ===
+          "number"
+        ) {
           setWeatherIcon(
-            getWeatherIcon(code)
+            getWeatherIcon(
+              code
+            )
           );
 
           setWeatherText(
-            getWeatherText(code)
+            getWeatherText(
+              code
+            )
           );
         }
       } catch {
         if (!cancelled) {
           setTemperature(null);
-          setWeatherIcon("🌤️");
+
+          setWeatherIcon(
+            "🌤️"
+          );
+
           setWeatherText(
             "Weather unavailable"
           );
         }
       } finally {
         if (!cancelled) {
-          setWeatherLoading(false);
+          setWeatherLoading(
+            false
+          );
         }
       }
     }
@@ -284,168 +800,226 @@ export default function Header() {
     };
   }, []);
 
-  /* =========================================================
+  /* =======================================================
      SEARCH
-  ========================================================= */
+  ======================================================== */
 
   const handleSearch = (
     event: FormEvent<HTMLFormElement>
   ) => {
     event.preventDefault();
 
-    const query = searchQuery.trim();
+    const query =
+      searchQuery.trim();
 
-    if (!query) return;
-
-    /*
-      Search is relative to the current locale.
-
-      We manually build the path so the current
-      language is preserved correctly.
-
-      /en        -> /en/search?q=...
-      /si        -> /si/search?q=...
-      /ta        -> /ta/search?q=...
-    */
-
-    const currentPath =
-      window.location.pathname;
-
-    const localeMatch =
-      currentPath.match(
-        /^\/(en|si|ta)(?=\/|$)/
-      );
-
-    const locale =
-      localeMatch?.[1] || "en";
+    if (!query) {
+      return;
+    }
 
     window.location.href =
-      `/${locale}/search?q=${encodeURIComponent(query)}`;
+      `/${locale}/search?q=${encodeURIComponent(
+        query
+      )}`;
 
     setSearchQuery("");
-    setMobileMenuOpen(false);
+
+    setMobileMenuOpen(
+      false
+    );
   };
 
-  /* =========================================================
-     LANGUAGE SWITCHER
-  ========================================================= */
+  /* =======================================================
+     LANGUAGE SWITCH
+  ======================================================== */
 
   const changeLanguage = (
-    locale: "en" | "si" | "ta"
+    nextLocale: Locale
   ) => {
     const currentPath =
       window.location.pathname;
 
     /*
-      Remove ONLY the existing locale from
-      the beginning of the URL.
-
-      Examples:
-
-      /en
-        -> /
-
-      /en/latest
-        -> /latest
-
-      /en/sports
-        -> /sports
-
-      /ta/latest
-        -> /latest
-    */
-
+     * Remove only the existing locale.
+     */
     const cleanPath =
       currentPath.replace(
         /^\/(en|si|ta)(?=\/|$)/,
         ""
       );
 
-    const nextPath =
-      cleanPath || "/";
-
-    /*
-      Add exactly one locale.
-    */
-
     const finalPath =
-      `/${locale}${
-        nextPath === "/"
-          ? ""
-          : nextPath
+      `/${nextLocale}${
+        cleanPath &&
+        cleanPath !== "/"
+          ? cleanPath
+          : ""
       }`;
-
-    /*
-      Use the browser navigation directly.
-      This guarantees the URL becomes:
-
-      /en/...
-      /si/...
-      /ta/...
-
-      and NEVER:
-
-      /en/ta/...
-      /si/en/...
-    */
 
     window.location.href =
       finalPath;
 
-    setMobileMenuOpen(false);
+    setMobileMenuOpen(
+      false
+    );
   };
+
+  /* =======================================================
+     MENU
+  ======================================================== */
+
+  const desktopMenuItems =
+    useMemo(() => {
+      return [...menuItems]
+        .filter(
+          (item) =>
+            item.isVisible &&
+            item.desktop &&
+            !isWatchLiveItem(
+              item
+            )
+        )
+        .sort(
+          (a, b) =>
+            a.position -
+            b.position
+        );
+    }, [menuItems]);
+
+  const mobileMenuItems =
+    useMemo(() => {
+      return [...menuItems]
+        .filter(
+          (item) =>
+            item.isVisible &&
+            item.mobile &&
+            !isWatchLiveItem(
+              item
+            )
+        )
+        .sort(
+          (a, b) =>
+            a.position -
+            b.position
+        );
+    }, [menuItems]);
+
+  const watchLiveItem =
+    useMemo(() => {
+      return menuItems.find(
+        (item) =>
+          item.isVisible &&
+          isWatchLiveItem(
+            item
+          )
+      );
+    }, [menuItems]);
+
+  /* =======================================================
+     ACTIVE MENU
+  ======================================================== */
+
+  function isMenuActive(
+    href: string
+  ): boolean {
+    if (isExternalUrl(href)) {
+      return false;
+    }
+
+    const normalizedHref =
+      normalizeInternalHref(
+        href
+      );
+
+    const currentPath =
+      pathname.replace(
+        /^\/(en|si|ta)(?=\/|$)/,
+        ""
+      ) || "/";
+
+    return (
+      normalizedHref ===
+        currentPath ||
+      (
+        normalizedHref !== "/" &&
+        currentPath.startsWith(
+          `${normalizedHref}/`
+        )
+      )
+    );
+  }
+
+  /* =======================================================
+     RENDER
+  ======================================================== */
 
   return (
     <header className="w-full bg-white dark:bg-[#151a2d]">
+
       {/* =====================================================
           TOP BAR
       ====================================================== */}
 
-      <div className="bg-gradient-to-r from-[#ec008c] via-[#b20aa5] to-[#4b168c] text-white">
-        <div className="tv-container flex min-h-[40px] items-center justify-between gap-3 text-sm">
+      <div className="w-full bg-gradient-to-r from-[#ec008c] via-[#b20aa5] to-[#4b168c] text-white">
 
-          {/* DATE + WEATHER */}
+        <div className="flex min-h-[42px] w-full items-center justify-between px-6 sm:px-8 lg:px-12 xl:px-16">
 
-          <div className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap">
-            <span className="truncate">
+          {/* LEFT */}
+
+          <div className="flex min-w-0 items-center gap-3 overflow-hidden whitespace-nowrap">
+
+            <span className="truncate text-sm font-medium lg:text-[15px] xl:text-base">
               {currentDate ||
                 "Loading date..."}
             </span>
 
-            <span className="hidden opacity-60 sm:inline">
+            <span className="opacity-50">
               |
             </span>
 
-            <span className="hidden sm:inline">
+            <span className="text-sm font-medium lg:text-[15px] xl:text-base">
               Colombo{" "}
               {weatherLoading
-                ? "Loading..."
-                : temperature !== null
+                ? "..."
+                : temperature !==
+                    null
                   ? `${temperature}°C`
                   : "--°C"}
             </span>
 
             <span
-              title={weatherText}
-              aria-label={weatherText}
+              className="text-base"
+              title={
+                weatherText
+              }
+              aria-label={
+                weatherText
+              }
             >
               {weatherIcon}
             </span>
+
           </div>
 
-          {/* RIGHT SIDE */}
+          {/* RIGHT */}
 
           <div className="flex shrink-0 items-center gap-3">
 
-            {/* LANGUAGES */}
+            {/* LANGUAGE */}
 
-            <div className="hidden items-center gap-4 sm:flex">
+            <div className="hidden items-center gap-1 md:flex">
+
               <button
                 type="button"
                 onClick={() =>
-                  changeLanguage("si")
+                  changeLanguage(
+                    "si"
+                  )
                 }
-                className="text-sm font-medium transition hover:opacity-75"
+                className={`rounded-full px-3 py-1.5 text-sm font-medium transition lg:text-[15px] xl:text-base ${
+                  locale === "si"
+                    ? "bg-white/20 font-bold"
+                    : "hover:bg-white/10"
+                }`}
               >
                 සිංහල
               </button>
@@ -453,9 +1027,15 @@ export default function Header() {
               <button
                 type="button"
                 onClick={() =>
-                  changeLanguage("ta")
+                  changeLanguage(
+                    "ta"
+                  )
                 }
-                className="text-sm font-medium transition hover:opacity-75"
+                className={`rounded-full px-3 py-1.5 text-sm font-medium transition lg:text-[15px] xl:text-base ${
+                  locale === "ta"
+                    ? "bg-white/20 font-bold"
+                    : "hover:bg-white/10"
+                }`}
               >
                 தமிழ்
               </button>
@@ -463,194 +1043,269 @@ export default function Header() {
               <button
                 type="button"
                 onClick={() =>
-                  changeLanguage("en")
+                  changeLanguage(
+                    "en"
+                  )
                 }
-                className="text-sm font-medium transition hover:opacity-75"
+                className={`rounded-full px-3 py-1.5 text-sm font-medium transition lg:text-[15px] xl:text-base ${
+                  locale === "en"
+                    ? "bg-white/20 font-bold"
+                    : "hover:bg-white/10"
+                }`}
               >
                 English
               </button>
+
             </div>
 
-            {/* THEME TOGGLE */}
+            {/* THEME */}
 
             <button
               type="button"
-              onClick={toggleTheme}
+              onClick={
+                toggleTheme
+              }
               aria-label={
                 darkMode
                   ? "Switch to light mode"
                   : "Switch to dark mode"
               }
-              className="flex h-8 items-center gap-1 rounded-full border border-white/40 bg-white/15 px-1.5 transition hover:bg-white/25"
+              className="flex h-8 items-center gap-0.5 rounded-full border border-white/40 bg-white/10 px-1"
             >
+
               <span
-                className={`flex h-6 w-6 items-center justify-center rounded-full transition ${
+                className={`flex h-6 w-6 items-center justify-center rounded-full ${
                   !darkMode
                     ? "bg-white text-orange-500"
                     : "text-white"
                 }`}
               >
-                <Sun size={14} />
+                <Sun
+                  size={13}
+                />
               </span>
 
               <span
-                className={`flex h-6 w-6 items-center justify-center rounded-full transition ${
+                className={`flex h-6 w-6 items-center justify-center rounded-full ${
                   darkMode
                     ? "bg-white text-indigo-700"
                     : "text-white"
                 }`}
               >
-                <Moon size={14} />
+                <Moon
+                  size={13}
+                />
               </span>
+
             </button>
 
-            {/* SOCIAL */}
+            {/* SOCIAL MEDIA */}
 
             <div className="hidden items-center gap-3 lg:flex">
-              <a
-                href="#"
-                aria-label="Facebook"
-                className="text-base font-bold transition hover:opacity-75"
-              >
-                f
-              </a>
 
-              <a
-                href="#"
-                aria-label="YouTube"
-                className="text-xs font-bold transition hover:opacity-75"
-              >
-                ▶
-              </a>
+              {siteConfig.social
+                .facebook && (
+                <a
+                  href={
+                    siteConfig
+                      .social
+                      .facebook
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Facebook"
+                  className="text-sm font-bold transition hover:opacity-70"
+                >
+                  f
+                </a>
+              )}
 
-              <a
-                href="#"
-                aria-label="Instagram"
-                className="text-base font-bold transition hover:opacity-75"
-              >
-                ◎
-              </a>
+              {siteConfig.social
+                .youtube && (
+                <a
+                  href={
+                    siteConfig
+                      .social
+                      .youtube
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="YouTube"
+                  className="text-xs font-bold transition hover:opacity-70"
+                >
+                  ▶
+                </a>
+              )}
 
-              <a
-                href="#"
-                aria-label="X"
-                className="text-base font-bold transition hover:opacity-75"
-              >
-                X
-              </a>
+              {siteConfig.social
+                .instagram && (
+                <a
+                  href={
+                    siteConfig
+                      .social
+                      .instagram
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Instagram"
+                  className="text-sm font-bold transition hover:opacity-70"
+                >
+                  ◎
+                </a>
+              )}
 
-              <a
-                href="#"
-                aria-label="TikTok"
-                className="transition hover:opacity-75"
-              >
-                <Music2 size={16} />
-              </a>
+              {siteConfig.social
+                .tiktok && (
+                <a
+                  href={
+                    siteConfig
+                      .social
+                      .tiktok
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="TikTok"
+                  className="transition hover:opacity-70"
+                >
+                  <Music2
+                    size={16}
+                  />
+                </a>
+              )}
+
             </div>
+
           </div>
+
         </div>
+
       </div>
 
       {/* =====================================================
-          MAIN HEADER
+          BRAND / SEARCH ROW
       ====================================================== */}
 
-      <div className="border-b border-slate-200 bg-white dark:border-[#30374e] dark:bg-[#151a2d]">
-        <div className="tv-container flex min-h-[92px] items-center justify-between gap-5">
+      <div className="w-full border-b border-slate-200 bg-white dark:border-[#30374e] dark:bg-[#151a2d]">
+
+        <div className="flex min-h-[82px] w-full items-center gap-8 px-6 sm:px-8 lg:px-12 xl:px-16">
 
           {/* LOGO */}
 
           <Link
             href="/"
+            aria-label="TV Supreme Home"
             className="shrink-0 transition-opacity hover:opacity-90"
           >
-            <div className="flex items-center gap-3">
-
-              {/* LOGO MARK */}
-
-              <div className="flex h-13 w-13 items-center justify-center rounded-xl bg-gradient-to-br from-[#ec008c] to-[#5b16a5] text-white shadow-sm">
-                <span className="text-2xl font-bold">
-                  ♛
-                </span>
-              </div>
-
-              {/* LOGO TEXT */}
-
-              <div>
-                <div className="text-xl font-black leading-none text-[#111d4a] dark:text-white sm:text-2xl">
-                  TV SUPREME
-                </div>
-
-                <div className="mt-1 text-[11px] font-medium tracking-wide text-slate-500 dark:text-slate-400 sm:text-xs">
-                  NEWS. PEOPLE. A BRIGHTER TOMORROW.
-                </div>
-              </div>
-            </div>
+            <img
+              src={
+                siteConfig.logoUrl ||
+                "/logo.png"
+              }
+              alt="TV Supreme"
+              className="h-14 w-auto max-w-[210px] object-contain sm:h-16 sm:max-w-[225px]"
+            />
           </Link>
 
           {/* TAGLINE */}
 
-          <div className="hidden xl:block">
-            <p className="text-sm font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              NEWS • PEOPLE • A BRIGHTER TOMORROW
-            </p>
+          <div className="hidden min-w-0 flex-1 lg:block">
+
+            {siteConfig.tagline && (
+              <p className="truncate text-xs font-medium tracking-wide text-slate-400 lg:text-sm xl:text-base">
+                {
+                  siteConfig.tagline
+                }
+              </p>
+            )}
+
           </div>
 
           {/* DESKTOP SEARCH */}
 
-          <div className="hidden flex-1 md:flex md:max-w-[420px]">
+          <div className="hidden w-full max-w-[460px] flex-1 lg:flex">
+
             <form
-              className="flex w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-50 dark:border-[#30374e] dark:bg-[#1c2238]"
-              onSubmit={handleSearch}
+              onSubmit={
+                handleSearch
+              }
+              className="flex w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-sm dark:border-[#30374e] dark:bg-[#1c2238]"
             >
+
               <input
                 type="search"
-                value={searchQuery}
+                value={
+                  searchQuery
+                }
                 onChange={(event) =>
                   setSearchQuery(
-                    event.target.value
+                    event.target
+                      .value
                   )
                 }
                 placeholder="Search news, videos..."
                 aria-label="Search news and videos"
-                className="min-w-0 flex-1 bg-transparent px-4 py-3 text-base text-[#111d4a] outline-none placeholder:text-slate-400 dark:text-white"
+                className="min-w-0 flex-1 bg-transparent px-4 py-3 text-[14px] text-[#111d4a] outline-none placeholder:text-slate-400 lg:text-[15px] xl:text-base dark:text-white"
               />
 
               <button
                 type="submit"
                 aria-label="Search"
-                className="flex w-13 items-center justify-center bg-gradient-to-r from-[#ec008c] to-[#6a1b9a] text-white transition hover:opacity-90"
+                className="flex w-12 items-center justify-center bg-gradient-to-r from-[#ec008c] to-[#6a1b9a] text-white transition hover:opacity-90"
               >
-                <Search size={20} />
+                <Search
+                  size={20}
+                />
               </button>
+
             </form>
+
           </div>
 
           {/* WATCH LIVE */}
 
-          <Link
-            href="/watch-live"
-            className="hidden shrink-0 items-center gap-2 rounded-lg bg-gradient-to-r from-[#ec008c] to-[#5b16a5] px-5 py-3 text-base font-bold text-white shadow-sm transition hover:scale-[1.02] hover:shadow-md sm:flex"
+          <MenuLink
+            item={
+              watchLiveItem ?? {
+                id: "watch-live-fallback",
+                language,
+                label: "Watch Now",
+                href: "/watch-live",
+                position: 0,
+                isVisible: true,
+                type: "System",
+                desktop: true,
+                mobile: true,
+                openNewTab: false,
+                createdAt: "",
+                updatedAt: "",
+              }
+            }
+            className="hidden shrink-0 items-center gap-2 rounded-lg bg-gradient-to-r from-[#ec008c] to-[#6a1b9a] px-5 py-3.5 text-sm font-bold !text-white shadow-sm transition hover:opacity-90 lg:flex lg:text-[15px] xl:px-6 xl:py-4 xl:text-base"
           >
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20">
+
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 !text-white">
+
               <Play
-                size={14}
+                size={13}
                 fill="currentColor"
               />
+
             </span>
 
-            <span>
-              Watch Live
+            <span className="!text-white">
+              {watchLiveItem?.label || "Watch Now"}
             </span>
-          </Link>
 
-          {/* MOBILE MENU */}
+          </MenuLink>
+
+          {/* MOBILE */}
 
           <button
             type="button"
             onClick={() =>
               setMobileMenuOpen(
-                (value) => !value
+                (value) =>
+                  !value
               )
             }
             aria-label={
@@ -661,37 +1316,77 @@ export default function Header() {
             aria-expanded={
               mobileMenuOpen
             }
-            className="flex h-12 w-12 items-center justify-center rounded-lg border border-slate-200 bg-white text-[#111d4a] transition hover:border-[#ec008c] hover:text-[#ec008c] dark:border-[#30374e] dark:bg-[#1c2238] dark:text-white md:hidden"
+            className="ml-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-[#111d4a] transition hover:border-[#ec008c] hover:text-[#ec008c] lg:hidden dark:border-[#30374e] dark:bg-[#1c2238] dark:text-white"
           >
             {mobileMenuOpen ? (
-              <X size={25} />
+              <X size={23} />
             ) : (
-              <Menu size={25} />
+              <Menu size={23} />
             )}
           </button>
+
         </div>
+
       </div>
 
       {/* =====================================================
           DESKTOP NAVIGATION
       ====================================================== */}
 
-      <nav className="hidden border-b border-slate-200 bg-white dark:border-[#30374e] dark:bg-[#151a2d] md:block">
-        <div className="tv-container">
-          <div className="flex items-center justify-center overflow-x-auto">
-            {navigation.map(
-              (item) => (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className="whitespace-nowrap border-b-2 border-transparent px-4 py-4 text-base font-semibold text-[#111d4a] transition hover:border-[#ec008c] hover:text-[#ec008c] dark:text-white dark:hover:text-[#ec008c]"
-                >
-                  {item.name}
-                </Link>
+      <nav className="hidden w-full border-b border-slate-200 bg-white dark:border-[#30374e] dark:bg-[#151a2d] lg:block">
+
+        <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16">
+
+          <div className="flex min-h-[48px] items-center overflow-x-auto">
+
+            {headerLoading ? (
+              <div className="py-3 text-sm text-slate-400">
+                Loading navigation...
+              </div>
+            ) : desktopMenuItems.length ===
+              0 ? (
+              <div className="py-3 text-sm text-slate-400">
+                No navigation items configured.
+              </div>
+            ) : (
+              desktopMenuItems.map(
+                (item) => {
+                  const active =
+                    isMenuActive(
+                      item.href
+                    );
+
+                  return (
+                    <MenuLink
+                      key={item.id}
+                      item={item}
+                      className={`relative shrink-0 whitespace-nowrap px-5 py-3 text-[14px] font-semibold transition lg:px-5 lg:text-[15px] xl:px-6 xl:text-base ${
+                        active
+                          ? "text-[#ec008c]"
+                          : "text-[#111d4a] hover:text-[#ec008c]"
+                      } dark:text-white dark:hover:text-[#ec008c]`}
+                    >
+
+                      {item.label}
+
+                      <span
+                        className={`absolute bottom-0 left-5 right-5 h-[3px] rounded-full bg-[#ec008c] ${
+                          active
+                            ? "opacity-100"
+                            : "opacity-0"
+                        }`}
+                      />
+
+                    </MenuLink>
+                  );
+                }
               )
             )}
+
           </div>
+
         </div>
+
       </nav>
 
       {/* =====================================================
@@ -699,26 +1394,33 @@ export default function Header() {
       ====================================================== */}
 
       {mobileMenuOpen && (
-        <div className="border-b border-slate-200 bg-white shadow-lg dark:border-[#30374e] dark:bg-[#151a2d] md:hidden">
-          <div className="tv-container py-5">
+        <div className="border-b border-slate-200 bg-white shadow-lg dark:border-[#30374e] dark:bg-[#151a2d] lg:hidden">
 
-            {/* MOBILE SEARCH */}
+          <div className="w-full px-6 py-5">
+
+            {/* SEARCH */}
 
             <form
+              onSubmit={
+                handleSearch
+              }
               className="mb-5 flex overflow-hidden rounded-lg border border-slate-200 bg-slate-50 dark:border-[#30374e] dark:bg-[#1c2238]"
-              onSubmit={handleSearch}
             >
+
               <input
                 type="search"
-                value={searchQuery}
+                value={
+                  searchQuery
+                }
                 onChange={(event) =>
                   setSearchQuery(
-                    event.target.value
+                    event.target
+                      .value
                   )
                 }
                 placeholder="Search news, videos..."
                 aria-label="Search news and videos"
-                className="min-w-0 flex-1 bg-transparent px-4 py-3.5 text-base text-[#111d4a] outline-none placeholder:text-slate-400 dark:text-white"
+                className="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm text-[#111d4a] outline-none placeholder:text-slate-400 dark:text-white"
               />
 
               <button
@@ -726,29 +1428,53 @@ export default function Header() {
                 aria-label="Search"
                 className="flex w-12 items-center justify-center bg-gradient-to-r from-[#ec008c] to-[#6a1b9a] text-white"
               >
-                <Search size={19} />
+                <Search
+                  size={19}
+                />
               </button>
+
             </form>
 
-            {/* CATEGORY MENU */}
+            {/* MOBILE NAV */}
 
             <nav className="space-y-1">
-              {navigation.map(
+
+              {mobileMenuItems.map(
                 (item) => {
-                  const Icon = item.icon;
+                  const Icon =
+                    getMenuIcon(
+                      item.href,
+                      item.label
+                    );
+
+                  const active =
+                    isMenuActive(
+                      item.href
+                    );
 
                   return (
-                    <Link
-                      key={item.name}
-                      href={item.href}
+                    <MenuLink
+                      key={item.id}
+                      item={item}
                       onClick={() =>
                         setMobileMenuOpen(
                           false
                         )
                       }
-                      className="group flex items-center gap-4 rounded-xl px-4 py-3.5 text-base font-semibold text-[#111d4a] transition hover:bg-fuchsia-50 hover:text-[#ec008c] dark:text-white dark:hover:bg-[#242044] dark:hover:text-[#ec008c]"
+                      className={`group flex items-center gap-4 rounded-xl px-4 py-3.5 text-base font-semibold transition ${
+                        active
+                          ? "bg-fuchsia-50 text-[#ec008c]"
+                          : "text-[#111d4a] hover:bg-fuchsia-50 hover:text-[#ec008c]"
+                      } dark:text-white dark:hover:bg-[#242044]`}
                     >
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-fuchsia-50 text-[#ec008c] transition group-hover:bg-[#ec008c] group-hover:text-white dark:bg-[#242044]">
+
+                      <span
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition ${
+                          active
+                            ? "bg-[#ec008c] text-white"
+                            : "bg-fuchsia-50 text-[#ec008c] group-hover:bg-[#ec008c] group-hover:text-white"
+                        } dark:bg-[#242044]`}
+                      >
                         <Icon
                           size={20}
                           strokeWidth={2}
@@ -756,28 +1482,40 @@ export default function Header() {
                       </span>
 
                       <span>
-                        {item.name}
+                        {
+                          item.label
+                        }
                       </span>
-                    </Link>
+
+                    </MenuLink>
                   );
                 }
               )}
+
             </nav>
 
-            {/* MOBILE LANGUAGES */}
+            {/* LANGUAGE */}
 
             <div className="mt-5 border-t border-slate-100 pt-5 dark:border-[#30374e]">
-              <p className="mb-3 px-1 text-sm font-semibold uppercase tracking-wide text-slate-400">
+
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
                 Language
               </p>
 
               <div className="flex flex-wrap gap-2">
+
                 <button
                   type="button"
                   onClick={() =>
-                    changeLanguage("si")
+                    changeLanguage(
+                      "si"
+                    )
                   }
-                  className="rounded-lg bg-fuchsia-50 px-4 py-2.5 text-sm font-semibold text-fuchsia-700 transition hover:bg-fuchsia-100 dark:bg-[#35172c] dark:text-fuchsia-300"
+                  className={`rounded-lg px-4 py-2.5 text-sm font-semibold ${
+                    locale === "si"
+                      ? "bg-[#ec008c] text-white"
+                      : "bg-fuchsia-50 text-fuchsia-700 dark:bg-[#35172c] dark:text-fuchsia-300"
+                  }`}
                 >
                   සිංහල
                 </button>
@@ -785,9 +1523,15 @@ export default function Header() {
                 <button
                   type="button"
                   onClick={() =>
-                    changeLanguage("ta")
+                    changeLanguage(
+                      "ta"
+                    )
                   }
-                  className="rounded-lg bg-fuchsia-50 px-4 py-2.5 text-sm font-semibold text-fuchsia-700 transition hover:bg-fuchsia-100 dark:bg-[#35172c] dark:text-fuchsia-300"
+                  className={`rounded-lg px-4 py-2.5 text-sm font-semibold ${
+                    locale === "ta"
+                      ? "bg-[#ec008c] text-white"
+                      : "bg-fuchsia-50 text-fuchsia-700 dark:bg-[#35172c] dark:text-fuchsia-300"
+                  }`}
                 >
                   தமிழ்
                 </button>
@@ -795,36 +1539,55 @@ export default function Header() {
                 <button
                   type="button"
                   onClick={() =>
-                    changeLanguage("en")
+                    changeLanguage(
+                      "en"
+                    )
                   }
-                  className="rounded-lg bg-fuchsia-50 px-4 py-2.5 text-sm font-semibold text-fuchsia-700 transition hover:bg-fuchsia-100 dark:bg-[#35172c] dark:text-fuchsia-300"
+                  className={`rounded-lg px-4 py-2.5 text-sm font-semibold ${
+                    locale === "en"
+                      ? "bg-[#ec008c] text-white"
+                      : "bg-fuchsia-50 text-fuchsia-700 dark:bg-[#35172c] dark:text-fuchsia-300"
+                  }`}
                 >
                   English
                 </button>
+
               </div>
+
             </div>
 
             {/* MOBILE WATCH LIVE */}
 
-            <Link
-              href="/watch-live"
-              onClick={() =>
-                setMobileMenuOpen(
-                  false
-                )
-              }
-              className="mt-5 flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#ec008c] to-[#5b16a5] px-4 py-3.5 text-base font-bold text-white shadow-sm"
-            >
-              <Play
-                size={16}
-                fill="currentColor"
-              />
+            {watchLiveItem && (
+              <MenuLink
+                item={
+                  watchLiveItem
+                }
+                onClick={() =>
+                  setMobileMenuOpen(
+                    false
+                  )
+                }
+                className="mt-5 flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#ec008c] to-[#6a1b9a] px-4 py-3.5 text-sm font-bold !text-white shadow-sm transition hover:opacity-90"
+              >
 
-              Watch Live
-            </Link>
+                <Play
+                  size={15}
+                  fill="currentColor"
+                />
+
+                <span className="!text-white">
+                  {watchLiveItem.label}
+                </span>
+
+              </MenuLink>
+            )}
+
           </div>
+
         </div>
       )}
+
     </header>
   );
 }

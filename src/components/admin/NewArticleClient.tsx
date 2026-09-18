@@ -44,6 +44,7 @@ type MediaOption = {
   id: string;
   filename: string;
   url: string;
+  type: "IMAGE" | "VIDEO";
   altText: string | null;
   size: number | null;
   width: number | null;
@@ -208,11 +209,23 @@ export default function NewArticleClient({
   const [uploadingImage, setUploadingImage] =
     useState(false);
 
+  const [selectedMediaIds, setSelectedMediaIds] =
+    useState<string[]>([]);
+
+  const [uploadingArticleMedia, setUploadingArticleMedia] =
+    useState(false);
+
   const imageInputRef =
     useRef<HTMLInputElement | null>(null);
 
+  const articleMediaInputRef =
+    useRef<HTMLInputElement | null>(null);
+
   /*
-   * Load existing image media from the Media Library.
+   * Load existing images and videos from the Media Library.
+   *
+   * Main Image uses only IMAGE records.
+   * Article Media can use both IMAGE and VIDEO records.
    */
   useEffect(() => {
     let cancelled = false;
@@ -222,7 +235,7 @@ export default function NewArticleClient({
 
       try {
         const response = await fetch(
-          "/api/admin/media?type=IMAGE&page=1&pageSize=100",
+          "/api/admin/media?page=1&pageSize=100",
           {
             cache: "no-store",
           },
@@ -230,71 +243,82 @@ export default function NewArticleClient({
 
         const data = await response.json();
 
-        if (!response.ok) {
+        if (!response.ok || !data.success) {
           throw new Error(
             data.error ||
+              data.message ||
               "Unable to load media from the Media Library.",
           );
         }
 
-        /*
-         * Support either `items` or `media`
-         * depending on the API response shape.
-         */
         const rawItems = Array.isArray(data.items)
           ? data.items
           : Array.isArray(data.media)
             ? data.media
             : [];
 
-        const imageItems: MediaOption[] =
+        const mappedMedia: MediaOption[] =
           rawItems
-            .filter(
-              (item: {
-                type?: string;
-              }) =>
-                !item.type ||
-                String(item.type).toUpperCase() ===
-                  "IMAGE",
-            )
             .map(
               (item: {
                 id?: string;
                 filename?: string;
                 name?: string;
                 url?: string;
+                type?: string;
                 altText?: string | null;
                 size?: number | null;
                 bytes?: number | null;
                 width?: number | null;
                 height?: number | null;
-              }) => ({
-                id: String(item.id ?? ""),
-                filename:
-                  item.filename ??
-                  item.name ??
-                  "Untitled image",
-                url: item.url ?? "",
-                altText:
-                  item.altText ?? null,
-                size:
-                  item.size ??
-                  item.bytes ??
-                  null,
-                width:
-                  item.width ?? null,
-                height:
-                  item.height ?? null,
-              }),
+              }) => {
+                const mediaType =
+                  String(
+                    item.type ?? "",
+                  ).toUpperCase();
+
+                const type =
+                  mediaType === "VIDEO"
+                    ? "VIDEO"
+                    : mediaType === "IMAGE"
+                      ? "IMAGE"
+                      : null;
+
+                if (!type) {
+                  return null;
+                }
+
+                return {
+                  id: String(item.id ?? ""),
+                  filename:
+                    item.filename ??
+                    item.name ??
+                    "Untitled media",
+                  url: item.url ?? "",
+                  type,
+                  altText:
+                    item.altText ?? null,
+                  size:
+                    item.size ??
+                    item.bytes ??
+                    null,
+                  width:
+                    item.width ?? null,
+                  height:
+                    item.height ?? null,
+                };
+              },
             )
             .filter(
-              (item: MediaOption) =>
-                Boolean(item.id) &&
-                Boolean(item.url),
+              (
+                item: MediaOption,
+              ): item is MediaOption =>
+                Boolean(item?.id) &&
+                Boolean(item?.url),
             );
 
         if (!cancelled) {
-          setMediaOptions(imageItems);
+          setMediaOptions(mappedMedia);
         }
       } catch (mediaError) {
         if (!cancelled) {
@@ -318,10 +342,50 @@ export default function NewArticleClient({
     };
   }, []);
 
+  const imageMediaOptions =
+    mediaOptions.filter(
+      (media) => media.type === "IMAGE",
+    );
+
+  const articleMediaOptions =
+    mediaOptions.filter(
+      (media) =>
+        media.type === "IMAGE" ||
+        media.type === "VIDEO",
+    );
+
   const selectedMainImage =
-    mediaOptions.find(
+    imageMediaOptions.find(
       (media) => media.id === mainImageId,
     ) ?? null;
+
+  const selectedArticleMedia =
+    selectedMediaIds
+      .map(
+        (id) =>
+          mediaOptions.find(
+            (media) => media.id === id,
+          ) ?? null,
+      )
+      .filter(
+        (media): media is MediaOption =>
+          media !== null,
+      );
+
+  const toggleArticleMedia = (
+    mediaId: string,
+  ) => {
+    setSelectedMediaIds((current) =>
+      current.includes(mediaId)
+        ? current.filter(
+            (id) => id !== mediaId,
+          )
+        : [
+            ...current,
+            mediaId,
+          ],
+    );
+  };
 
   const updateTranslation = (
     language: Language,
@@ -404,31 +468,54 @@ export default function NewArticleClient({
 
   /*
    * ============================================================
-   * MAIN IMAGE UPLOAD
+   * MAIN IMAGE / ARTICLE MEDIA UPLOAD
    * ============================================================
    */
-  const uploadMainImage = async (
+
+  const uploadMediaFile = async (
     file: File,
+    purpose: "MAIN_IMAGE" | "ARTICLE_MEDIA",
   ) => {
     if (!file) {
       return;
     }
 
-    if (!file.type.startsWith("image/")) {
+    const isImage =
+      file.type.startsWith("image/");
+
+    const isVideo =
+      file.type.startsWith("video/");
+
+    if (!isImage && !isVideo) {
       setError(
-        "Please select a valid image file.",
+        "Please select an image or video file.",
       );
       return;
     }
 
     if (file.size <= 0) {
       setError(
-        "The selected image file is empty.",
+        "The selected media file is empty.",
       );
       return;
     }
 
-    setUploadingImage(true);
+    if (
+      purpose === "MAIN_IMAGE" &&
+      !isImage
+    ) {
+      setError(
+        "The Main Image must be an image file.",
+      );
+      return;
+    }
+
+    if (purpose === "MAIN_IMAGE") {
+      setUploadingImage(true);
+    } else {
+      setUploadingArticleMedia(true);
+    }
+
     setError("");
     setSavedMessage("");
 
@@ -451,10 +538,11 @@ export default function NewArticleClient({
       const data =
         await response.json();
 
-      if (!response.ok) {
+      if (!response.ok || !data.success) {
         throw new Error(
           data.error ||
-            "Unable to upload the image.",
+            data.message ||
+            "Unable to upload the media file.",
         );
       }
 
@@ -467,9 +555,20 @@ export default function NewArticleClient({
         !uploadedMedia.url
       ) {
         throw new Error(
-          "The uploaded image response is invalid.",
+          "The uploaded media response is invalid.",
         );
       }
+
+      const uploadedType =
+        String(
+          uploadedMedia.type ??
+            "",
+        ).toUpperCase();
+
+      const newMediaType: "IMAGE" | "VIDEO" =
+        uploadedType === "VIDEO"
+          ? "VIDEO"
+          : "IMAGE";
 
       const newMedia: MediaOption = {
         id: String(
@@ -480,6 +579,8 @@ export default function NewArticleClient({
           file.name,
         url:
           uploadedMedia.url,
+        type:
+          newMediaType,
         altText:
           uploadedMedia.altText ??
           null,
@@ -505,47 +606,244 @@ export default function NewArticleClient({
         ],
       );
 
-      /*
-       * IMPORTANT:
-       * Automatically select the newly uploaded
-       * image as the article's main image.
-       */
-      setMainImageId(
-        newMedia.id,
-      );
+      if (
+        purpose === "MAIN_IMAGE"
+      ) {
+        setMainImageId(
+          newMedia.id,
+        );
 
-      setSavedMessage(
-        "Image uploaded and selected as the main image.",
-      );
+        setSavedMessage(
+          "Image uploaded and selected as the main image.",
+        );
+      } else {
+        setSelectedMediaIds(
+          (current) =>
+            current.includes(
+              newMedia.id,
+            )
+              ? current
+              : [
+                  ...current,
+                  newMedia.id,
+                ],
+        );
+
+        /*
+         * If an article media upload is an image and
+         * no Main Image is selected yet, select it as
+         * the Main Image as a convenience.
+         */
+        if (
+          newMediaType === "IMAGE" &&
+          !mainImageId
+        ) {
+          setMainImageId(
+            newMedia.id,
+          );
+        }
+
+        setSavedMessage(
+          "Media uploaded and added to the article.",
+        );
+      }
     } catch (uploadError) {
       setError(
         uploadError instanceof Error
           ? uploadError.message
-          : "Unable to upload the image.",
+          : "Unable to upload the media file.",
       );
     } finally {
-      setUploadingImage(false);
+      if (
+        purpose === "MAIN_IMAGE"
+      ) {
+        setUploadingImage(false);
+      } else {
+        setUploadingArticleMedia(false);
+      }
     }
   };
 
-  const handleMainImageFileChange = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file =
-      event.target.files?.[0];
+  const handleMainImageFileChange =
+    async (
+      event: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+      const file =
+        event.target.files?.[0];
 
-    /*
-     * Reset the input so the same file can be
-     * selected again later if needed.
-     */
-    event.target.value = "";
+      event.target.value = "";
 
-    if (!file) {
-      return;
-    }
+      if (!file) {
+        return;
+      }
 
-    await uploadMainImage(file);
-  };
+      await uploadMediaFile(
+        file,
+        "MAIN_IMAGE",
+      );
+    };
+
+  const handleArticleMediaFileChange =
+    async (
+      event: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+      const files = Array.from(
+        event.target.files ?? [],
+      );
+
+      event.target.value = "";
+
+      if (files.length === 0) {
+        return;
+      }
+
+      setUploadingArticleMedia(true);
+      setError("");
+      setSavedMessage("");
+
+      try {
+        for (const file of files) {
+          const isImage =
+            file.type.startsWith("image/");
+          const isVideo =
+            file.type.startsWith("video/");
+
+          if (!isImage && !isVideo) {
+            continue;
+          }
+
+          if (file.size <= 0) {
+            continue;
+          }
+
+          const formData =
+            new FormData();
+
+          formData.append(
+            "file",
+            file,
+          );
+
+          const response =
+            await fetch(
+              "/api/admin/media",
+              {
+                method: "POST",
+                body: formData,
+              },
+            );
+
+          const data =
+            await response.json();
+
+          if (
+            !response.ok ||
+            !data.success
+          ) {
+            throw new Error(
+              data.error ||
+                data.message ||
+                `Unable to upload ${file.name}.`,
+            );
+          }
+
+          const uploadedMedia =
+            data.media;
+
+          if (
+            !uploadedMedia?.id ||
+            !uploadedMedia?.url
+          ) {
+            throw new Error(
+              `Invalid upload response for ${file.name}.`,
+            );
+          }
+
+          const uploadedType =
+            String(
+              uploadedMedia.type ??
+                "",
+            ).toUpperCase();
+
+          const newMediaType: "IMAGE" | "VIDEO" =
+            uploadedType ===
+            "VIDEO"
+              ? "VIDEO"
+              : "IMAGE";
+
+          const newMedia: MediaOption = {
+            id: String(
+              uploadedMedia.id,
+            ),
+            filename:
+              uploadedMedia.filename ??
+              file.name,
+            url:
+              uploadedMedia.url,
+            type:
+              newMediaType,
+            altText:
+              uploadedMedia.altText ??
+              null,
+            size:
+              uploadedMedia.size ??
+              file.size,
+            width:
+              uploadedMedia.width ??
+              null,
+            height:
+              uploadedMedia.height ??
+              null,
+          };
+
+          setMediaOptions(
+            (current) => [
+              newMedia,
+              ...current.filter(
+                (media) =>
+                  media.id !==
+                  newMedia.id,
+              ),
+            ],
+          );
+
+          setSelectedMediaIds(
+            (current) =>
+              current.includes(
+                newMedia.id,
+              )
+                ? current
+                : [
+                    ...current,
+                    newMedia.id,
+                  ],
+          );
+
+          if (
+            newMediaType === "IMAGE" &&
+            !mainImageId
+          ) {
+            setMainImageId(
+              newMedia.id,
+            );
+          }
+        }
+
+        setSavedMessage(
+          "Selected media uploaded and added to the article.",
+        );
+      } catch (uploadError) {
+        setError(
+          uploadError instanceof Error
+            ? uploadError.message
+            : "Unable to upload article media.",
+        );
+      } finally {
+        setUploadingArticleMedia(
+          false,
+        );
+      }
+    };
 
   const getPublishDateValue = () => {
     if (
@@ -733,6 +1031,22 @@ export default function NewArticleClient({
       return;
     }
 
+    const invalidMediaIds =
+      selectedMediaIds.filter(
+        (mediaId) =>
+          !mediaOptions.some(
+            (media) =>
+              media.id === mediaId,
+          ),
+      );
+
+    if (invalidMediaIds.length > 0) {
+      setError(
+        "One or more selected article media items are no longer available. Please refresh and choose them again.",
+      );
+      return;
+    }
+
     const translationPayload =
       buildTranslationPayload();
 
@@ -793,6 +1107,9 @@ export default function NewArticleClient({
               translationPayload,
 
             tags,
+
+            mediaIds:
+              selectedMediaIds,
           }),
         },
       );
@@ -1635,15 +1952,14 @@ export default function NewArticleClient({
                     </h2>
 
                     <p className="mt-1 text-sm leading-6 text-slate-500">
-                      Select an image from the Media
-                      Library or upload a new one.
+                      Choose the primary image that
+                      represents this article.
                     </p>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-4 p-5">
-                {/* Hidden upload input */}
                 <input
                   ref={
                     imageInputRef
@@ -1656,7 +1972,6 @@ export default function NewArticleClient({
                   }
                 />
 
-                {/* Preview */}
                 {selectedMainImage ? (
                   <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
                     <div className="aspect-video w-full overflow-hidden bg-slate-100">
@@ -1673,42 +1988,18 @@ export default function NewArticleClient({
                     </div>
 
                     <div className="space-y-3 p-4">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-800">
-                          {
-                            selectedMainImage.filename
-                          }
-                        </p>
-
-                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
-                          {selectedMainImage.width &&
-                          selectedMainImage.height ? (
-                            <span>
-                              {
-                                selectedMainImage.width
-                              }{" "}
-                              ×{" "}
-                              {
-                                selectedMainImage.height
-                              }
-                            </span>
-                          ) : null}
-
-                          {selectedMainImage.size ? (
-                            <span>
-                              {formatFileSize(
-                                selectedMainImage.size,
-                              )}
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
+                      <p className="truncate text-sm font-semibold text-slate-800">
+                        {
+                          selectedMainImage.filename
+                        }
+                      </p>
 
                       <div className="flex flex-col gap-2 sm:flex-row">
                         <button
                           type="button"
                           disabled={
-                            uploadingImage
+                            uploadingImage ||
+                            uploadingArticleMedia
                           }
                           onClick={() =>
                             imageInputRef.current?.click()
@@ -1748,48 +2039,29 @@ export default function NewArticleClient({
                     </p>
 
                     <p className="mt-1 text-xs leading-5 text-slate-400">
-                      Choose an existing image below
-                      or upload a new image.
+                      Select an image from the Media Library
+                      or upload a new one.
                     </p>
-
-                    <button
-                      type="button"
-                      disabled={
-                        uploadingImage
-                      }
-                      onClick={() =>
-                        imageInputRef.current?.click()
-                      }
-                      className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <Plus size={16} />
-                      {uploadingImage
-                        ? "Uploading..."
-                        : "Upload New Image"}
-                    </button>
                   </div>
                 )}
 
-                {/* Upload / choose buttons */}
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <button
-                    type="button"
-                    disabled={
-                      uploadingImage
-                    }
-                    onClick={() =>
-                      imageInputRef.current?.click()
-                    }
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-pink-300 hover:text-pink-600 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <Plus size={17} />
-                    {uploadingImage
-                      ? "Uploading..."
-                      : "Upload New Image"}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  disabled={
+                    uploadingImage ||
+                    uploadingArticleMedia
+                  }
+                  onClick={() =>
+                    imageInputRef.current?.click()
+                  }
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-pink-300 hover:text-pink-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Plus size={17} />
+                  {uploadingImage
+                    ? "Uploading..."
+                    : "Upload New Image"}
+                </button>
 
-                {/* Media Library selector */}
                 <div>
                   <label
                     htmlFor="mainImage"
@@ -1815,7 +2087,8 @@ export default function NewArticleClient({
                       }
                       disabled={
                         loadingMedia ||
-                        uploadingImage
+                        uploadingImage ||
+                        uploadingArticleMedia
                       }
                       className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 outline-none transition focus:border-pink-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
                     >
@@ -1825,7 +2098,7 @@ export default function NewArticleClient({
                           : "Choose an image"}
                       </option>
 
-                      {mediaOptions.map(
+                      {imageMediaOptions.map(
                         (media) => (
                           <option
                             key={
@@ -1850,28 +2123,283 @@ export default function NewArticleClient({
                   </div>
 
                   {!loadingMedia &&
-                    mediaOptions.length ===
+                    imageMediaOptions.length ===
                       0 && (
                       <p className="mt-2 text-xs leading-5 text-slate-400">
                         No images are currently
                         available in the Media Library.
-                        Upload an image to use it here.
-                      </p>
-                    )}
-
-                  {!loadingMedia &&
-                    mediaOptions.length >
-                      0 && (
-                      <p className="mt-2 text-xs leading-5 text-slate-400">
-                        {mediaOptions.length} image
-                        {mediaOptions.length ===
-                        1
-                          ? ""
-                          : "s"}{" "}
-                        available in the Media Library.
                       </p>
                     )}
                 </div>
+              </div>
+            </section>
+
+            {/* ARTICLE MEDIA */}
+            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-200 px-5 py-5">
+                <div className="flex items-start gap-3">
+                  <div className="shrink-0 rounded-xl bg-pink-50 p-3 text-pink-600">
+                    <Video
+                      size={19}
+                    />
+                  </div>
+
+                  <div className="min-w-0">
+                    <h2 className="text-lg font-semibold text-slate-900">
+                      Article Media
+                    </h2>
+
+                    <p className="mt-1 text-sm leading-6 text-slate-500">
+                      Add multiple images and videos
+                      to this article.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 p-5">
+                <input
+                  ref={
+                    articleMediaInputRef
+                  }
+                  type="file"
+                  accept="image/*,video/*"
+                  multiple
+                  className="hidden"
+                  onChange={
+                    handleArticleMediaFileChange
+                  }
+                />
+
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <button
+                    type="button"
+                    disabled={
+                      uploadingArticleMedia
+                    }
+                    onClick={() =>
+                      articleMediaInputRef.current?.click()
+                    }
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Plus size={17} />
+                    {uploadingArticleMedia
+                      ? "Uploading..."
+                      : "Upload Images / Videos"}
+                  </button>
+                </div>
+
+                <div>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-700">
+                        Media Library
+                      </p>
+
+                      <p className="mt-1 text-xs text-slate-400">
+                        Select one or more images or videos.
+                      </p>
+                    </div>
+
+                    <span className="shrink-0 rounded-full bg-pink-50 px-3 py-1 text-xs font-semibold text-pink-700">
+                      {
+                        selectedMediaIds.length
+                      }{" "}
+                      selected
+                    </span>
+                  </div>
+
+                  {loadingMedia ? (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-400">
+                      Loading media...
+                    </div>
+                  ) : articleMediaOptions.length ===
+                    0 ? (
+                    <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-6 text-center">
+                      <ImageIcon
+                        size={28}
+                        className="mx-auto text-slate-300"
+                      />
+
+                      <p className="mt-3 text-sm font-semibold text-slate-600">
+                        No images or videos available
+                      </p>
+
+                      <p className="mt-1 text-xs leading-5 text-slate-400">
+                        Upload media to the Media Library
+                        to add it to this article.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {articleMediaOptions.map(
+                        (media) => {
+                          const isSelected =
+                            selectedMediaIds.includes(
+                              media.id,
+                            );
+
+                          return (
+                            <button
+                              key={
+                                media.id
+                              }
+                              type="button"
+                              onClick={() =>
+                                toggleArticleMedia(
+                                  media.id,
+                                )
+                              }
+                              className={`overflow-hidden rounded-2xl border text-left transition ${
+                                isSelected
+                                  ? "border-pink-500 ring-2 ring-pink-100"
+                                  : "border-slate-200 hover:border-pink-300"
+                              }`}
+                            >
+                              <div className="relative aspect-video overflow-hidden bg-slate-100">
+                                {media.type ===
+                                "IMAGE" ? (
+                                  <img
+                                    src={
+                                      media.url
+                                    }
+                                    alt={
+                                      media.altText ||
+                                      media.filename
+                                    }
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center bg-slate-900 text-white">
+                                    <Video
+                                      size={34}
+                                    />
+                                  </div>
+                                )}
+
+                                <span
+                                  className={`absolute right-2 top-2 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                                    isSelected
+                                      ? "bg-pink-600 text-white"
+                                      : "bg-white/90 text-slate-700"
+                                  }`}
+                                >
+                                  {isSelected
+                                    ? "Selected"
+                                    : media.type ===
+                                        "IMAGE"
+                                      ? "Image"
+                                      : "Video"}
+                                </span>
+                              </div>
+
+                              <div className="p-3">
+                                <p className="truncate text-sm font-semibold text-slate-800">
+                                  {
+                                    media.filename
+                                  }
+                                </p>
+
+                                <p className="mt-1 text-xs text-slate-400">
+                                  {media.type ===
+                                  "IMAGE"
+                                    ? "Image"
+                                    : "Video"}
+                                </p>
+                              </div>
+                            </button>
+                          );
+                        },
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {selectedArticleMedia.length >
+                  0 && (
+                  <div>
+                    <div className="mb-3 flex items-center justify-between">
+                      <p className="text-sm font-semibold text-slate-700">
+                        Selected Media
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelectedMediaIds([])
+                        }
+                        className="text-xs font-semibold text-red-600 hover:text-red-700"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {selectedArticleMedia.map(
+                        (media, index) => (
+                          <div
+                            key={
+                              media.id
+                            }
+                            className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-2.5"
+                          >
+                            <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                              {media.type ===
+                              "IMAGE" ? (
+                                <img
+                                  src={
+                                    media.url
+                                  }
+                                  alt={
+                                    media.altText ||
+                                    media.filename
+                                  }
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center bg-slate-900 text-white">
+                                  <Video
+                                    size={20}
+                                  />
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-semibold text-slate-800">
+                                {index + 1}.{" "}
+                                {
+                                  media.filename
+                                }
+                              </p>
+
+                              <p className="mt-0.5 text-xs text-slate-400">
+                                {
+                                  media.type
+                                }
+                              </p>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                toggleArticleMedia(
+                                  media.id,
+                                )
+                              }
+                              className="shrink-0 rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                              aria-label={`Remove ${media.filename}`}
+                            >
+                              <X
+                                size={16}
+                              />
+                            </button>
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </section>
 
@@ -1945,34 +2473,6 @@ export default function NewArticleClient({
                     />
                   }
                 />
-              </div>
-            </section>
-
-            {/* VIDEO */}
-            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="border-b border-slate-200 px-5 py-5">
-                <h2 className="text-lg font-semibold text-slate-900">
-                  Video
-                </h2>
-
-                <p className="mt-1 text-sm leading-6 text-slate-500">
-                  Videos are managed through
-                  the Video CMS.
-                </p>
-              </div>
-
-              <div className="p-5">
-                <div className="flex items-start gap-3 rounded-xl bg-slate-50 p-4">
-                  <Video
-                    size={20}
-                    className="mt-0.5 shrink-0 text-slate-400"
-                  />
-
-                  <p className="text-xs leading-5 text-slate-500">
-                    Video management will be
-                    connected separately.
-                  </p>
-                </div>
               </div>
             </section>
           </div>

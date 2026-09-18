@@ -16,7 +16,12 @@ import {
   Video,
   Zap,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 /* ===============================================================
    TYPES
@@ -55,6 +60,7 @@ type DashboardArticle = {
 
 type DashboardMedia = {
   count: number;
+  totalSizeBytes: number;
 };
 
 type DashboardResponse = {
@@ -120,6 +126,37 @@ function formatDate(value: string | null) {
   });
 }
 
+function formatFileSize(bytes: number) {
+  if (!bytes || bytes <= 0) {
+    return "0 B";
+  }
+
+  const units = [
+    "B",
+    "KB",
+    "MB",
+    "GB",
+    "TB",
+  ];
+
+  const index = Math.floor(
+    Math.log(bytes) / Math.log(1024),
+  );
+
+  const safeIndex = Math.min(
+    index,
+    units.length - 1,
+  );
+
+  const value =
+    bytes /
+    Math.pow(1024, safeIndex);
+
+  return `${value.toFixed(
+    safeIndex === 0 ? 0 : 2,
+  )} ${units[safeIndex]}`;
+}
+
 function getStatusLabel(status: string) {
   switch (status) {
     case "DRAFT":
@@ -175,93 +212,111 @@ function getStatusClasses(status: string) {
 =============================================================== */
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalNews: 0,
-    drafts: 0,
-    review: 0,
-    published: 0,
-    scheduled: 0,
-    archived: 0,
-  });
-
-  const [recentArticles, setRecentArticles] = useState<
-    DashboardArticle[]
-  >([]);
-
-  const [categories, setCategories] = useState<
-    DashboardCategory[]
-  >([]);
-
-  const [mediaCount, setMediaCount] = useState(0);
-
-  const [isLoading, setIsLoading] = useState(true);
-
-  const [error, setError] = useState("");
-
   /* =============================================================
-     LOAD DASHBOARD
+     STATE
   ============================================================= */
 
-  const loadDashboard = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError("");
+  const [stats, setStats] =
+    useState<DashboardStats>({
+      totalNews: 0,
+      drafts: 0,
+      review: 0,
+      published: 0,
+      scheduled: 0,
+      archived: 0,
+    });
 
-      const response = await fetch(
-        "/api/admin/dashboard",
-        {
-          method: "GET",
-          cache: "no-store",
-        },
-      );
+  const [recentArticles, setRecentArticles] =
+    useState<DashboardArticle[]>([]);
 
-      const data: DashboardResponse =
-        await response.json();
+  const [categories, setCategories] =
+    useState<DashboardCategory[]>([]);
 
-      if (!response.ok || !data.success) {
-        throw new Error(
-          data.message ||
-            "Failed to load dashboard.",
+  const [mediaCount, setMediaCount] =
+    useState(0);
+
+  const [mediaSizeBytes, setMediaSizeBytes] =
+    useState(0);
+
+  const [isLoading, setIsLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState("");
+
+  /* =============================================================
+     LOAD DASHBOARD DATA
+  ============================================================= */
+
+  const loadDashboard =
+    useCallback(async () => {
+      try {
+        setIsLoading(true);
+        setError("");
+
+        const response = await fetch(
+          "/api/admin/dashboard",
+          {
+            method: "GET",
+            cache: "no-store",
+          },
         );
+
+        const data: DashboardResponse =
+          await response.json();
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+          throw new Error(
+            data.message ||
+              "Failed to load dashboard.",
+          );
+        }
+
+        setStats(
+          data.stats ?? {
+            totalNews: 0,
+            drafts: 0,
+            review: 0,
+            published: 0,
+            scheduled: 0,
+            archived: 0,
+          },
+        );
+
+        setRecentArticles(
+          data.recentArticles ?? [],
+        );
+
+        setCategories(
+          data.categories ?? [],
+        );
+
+        setMediaCount(
+          data.media?.count ?? 0,
+        );
+
+        setMediaSizeBytes(
+          data.media?.totalSizeBytes ??
+            0,
+        );
+      } catch (dashboardError) {
+        console.error(
+          "Failed to load dashboard:",
+          dashboardError,
+        );
+
+        setError(
+          dashboardError instanceof Error
+            ? dashboardError.message
+            : "Failed to load dashboard.",
+        );
+      } finally {
+        setIsLoading(false);
       }
-
-      setStats(
-        data.stats ?? {
-          totalNews: 0,
-          drafts: 0,
-          review: 0,
-          published: 0,
-          scheduled: 0,
-          archived: 0,
-        },
-      );
-
-      setRecentArticles(
-        data.recentArticles ?? [],
-      );
-
-      setCategories(
-        data.categories ?? [],
-      );
-
-      setMediaCount(
-        data.media?.count ?? 0,
-      );
-    } catch (dashboardError) {
-      console.error(
-        "Failed to load dashboard:",
-        dashboardError,
-      );
-
-      setError(
-        dashboardError instanceof Error
-          ? dashboardError.message
-          : "Failed to load dashboard.",
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    }, []);
 
   /* =============================================================
      INITIAL LOAD
@@ -341,6 +396,10 @@ export default function AdminDashboard() {
     [stats],
   );
 
+  /* =============================================================
+     RENDER
+  ============================================================= */
+
   return (
     <div className="space-y-6">
       {/* =========================================================
@@ -381,7 +440,9 @@ export default function AdminDashboard() {
 
           <button
             type="button"
-            onClick={() => void loadDashboard()}
+            onClick={() =>
+              void loadDashboard()
+            }
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-red-600 shadow-sm ring-1 ring-red-200 transition hover:bg-red-50"
           >
             <RefreshCw size={14} />
@@ -410,7 +471,9 @@ export default function AdminDashboard() {
                   </p>
 
                   <p className="mt-2 text-3xl font-bold text-slate-900">
-                    {isLoading ? "…" : stat.value}
+                    {isLoading
+                      ? "…"
+                      : stat.value}
                   </p>
                 </div>
 
@@ -468,7 +531,8 @@ export default function AdminDashboard() {
                   </p>
                 </div>
               </div>
-            ) : recentArticles.length === 0 ? (
+            ) : recentArticles.length ===
+              0 ? (
               <div className="flex min-h-[260px] flex-col items-center justify-center text-center">
                 <div className="rounded-2xl bg-slate-50 p-4">
                   <Newspaper
@@ -525,7 +589,8 @@ export default function AdminDashboard() {
 
                         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
                           <span>
-                            {article.category?.name ??
+                            {article.category
+                              ?.name ??
                               "Uncategorized"}
                           </span>
 
@@ -575,36 +640,38 @@ export default function AdminDashboard() {
           </div>
 
           <div className="space-y-3">
-            {quickActions.map((action) => {
-              const Icon = action.icon;
+            {quickActions.map(
+              (action) => {
+                const Icon = action.icon;
 
-              return (
-                <Link
-                  key={action.title}
-                  href={action.href}
-                  className="flex w-full items-center gap-3 rounded-xl border border-slate-200 p-3 text-left transition hover:border-pink-200 hover:bg-pink-50"
-                >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-pink-50 text-pink-600">
-                    <Icon size={18} />
-                  </span>
-
-                  <span className="min-w-0">
-                    <span className="block text-sm font-semibold text-slate-800">
-                      {action.title}
+                return (
+                  <Link
+                    key={action.title}
+                    href={action.href}
+                    className="flex w-full items-center gap-3 rounded-xl border border-slate-200 p-3 text-left transition hover:border-pink-200 hover:bg-pink-50"
+                  >
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-pink-50 text-pink-600">
+                      <Icon size={18} />
                     </span>
 
-                    <span className="mt-0.5 block text-xs text-slate-400">
-                      {action.description}
-                    </span>
-                  </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-slate-800">
+                        {action.title}
+                      </span>
 
-                  <ArrowRight
-                    size={15}
-                    className="ml-auto shrink-0 text-slate-300"
-                  />
-                </Link>
-              );
-            })}
+                      <span className="mt-0.5 block text-xs text-slate-400">
+                        {action.description}
+                      </span>
+                    </span>
+
+                    <ArrowRight
+                      size={15}
+                      className="ml-auto shrink-0 text-slate-300"
+                    />
+                  </Link>
+                );
+              },
+            )}
           </div>
         </section>
       </div>
@@ -638,20 +705,21 @@ export default function AdminDashboard() {
 
           {isLoading ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {Array.from({ length: 8 }).map(
-                (_, index) => (
-                  <div
-                    key={index}
-                    className="animate-pulse rounded-xl border border-slate-200 bg-slate-50 p-4"
-                  >
-                    <div className="h-3 w-20 rounded bg-slate-200" />
+              {Array.from({
+                length: 8,
+              }).map((_, index) => (
+                <div
+                  key={index}
+                  className="animate-pulse rounded-xl border border-slate-200 bg-slate-50 p-4"
+                >
+                  <div className="h-3 w-20 rounded bg-slate-200" />
 
-                    <div className="mt-3 h-6 w-10 rounded bg-slate-200" />
-                  </div>
-                ),
-              )}
+                  <div className="mt-3 h-6 w-10 rounded bg-slate-200" />
+                </div>
+              ))}
             </div>
-          ) : categories.length === 0 ? (
+          ) : categories.length ===
+            0 ? (
             <div className="flex min-h-[150px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50">
               <p className="text-sm text-slate-400">
                 No categories found.
@@ -696,7 +764,11 @@ export default function AdminDashboard() {
 
           <div className="space-y-4">
             {cmsOverview.map(
-              ([label, value, description]) => (
+              ([
+                label,
+                value,
+                description,
+              ]) => (
                 <div
                   key={label}
                   className="flex items-center gap-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3"
@@ -749,34 +821,42 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="mt-5 h-3 overflow-hidden rounded-full bg-slate-100">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-pink-600 to-purple-600 transition-all"
-              style={{
-                width:
-                  mediaCount > 0
-                    ? "25%"
-                    : "0%",
-              }}
-            />
+          {/* =====================================================
+              MEDIA STORAGE
+          ====================================================== */}
+
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-medium text-slate-500">
+                Files
+              </p>
+
+              <p className="mt-2 text-2xl font-bold text-slate-900">
+                {isLoading
+                  ? "…"
+                  : mediaCount}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-medium text-slate-500">
+                Storage Used
+              </p>
+
+              <p className="mt-2 text-2xl font-bold text-slate-900">
+                {isLoading
+                  ? "…"
+                  : formatFileSize(
+                      mediaSizeBytes,
+                    )}
+              </p>
+            </div>
           </div>
 
-          <div className="mt-3 flex items-center justify-between text-xs">
-            <span className="text-slate-400">
-              {isLoading
-                ? "Loading..."
-                : `${mediaCount} ${
-                    mediaCount === 1
-                      ? "file"
-                      : "files"
-                  }`}
-            </span>
-
-            <span className="font-medium text-slate-500">
-              {mediaCount > 0
-                ? "Media available"
-                : "Storage unused"}
-            </span>
+          <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-xs leading-relaxed text-slate-400">
+              Storage usage is calculated from the media files stored in the database.
+            </p>
           </div>
         </section>
 

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import {
   FormEvent,
+  useEffect,
+  useRef,
   useState,
 } from "react";
 import {
@@ -38,6 +40,16 @@ type AuthorOption = {
   role: string;
 };
 
+type MediaOption = {
+  id: string;
+  filename: string;
+  url: string;
+  altText: string | null;
+  size: number | null;
+  width: number | null;
+  height: number | null;
+};
+
 type TranslationState = {
   title: string;
   summary: string;
@@ -71,21 +83,19 @@ const languageLabels: Record<
   TA: "தமிழ்",
 };
 
-const emptyTranslation: TranslationState =
-  {
-    title: "",
-    summary: "",
-    content: "",
-    seoTitle: "",
-    seoDescription: "",
-  };
+const emptyTranslation: TranslationState = {
+  title: "",
+  summary: "",
+  content: "",
+  seoTitle: "",
+  seoDescription: "",
+};
 
-const emptyTranslations: TranslationsState =
-  {
-    EN: { ...emptyTranslation },
-    SI: { ...emptyTranslation },
-    TA: { ...emptyTranslation },
-  };
+const emptyTranslations: TranslationsState = {
+  EN: { ...emptyTranslation },
+  SI: { ...emptyTranslation },
+  TA: { ...emptyTranslation },
+};
 
 function generateSlug(value: string) {
   return value
@@ -94,6 +104,26 @@ function generateSlug(value: string) {
     .replace(/[^a-z0-9\s-]/g, "")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-");
+}
+
+function formatFileSize(bytes: number | null | undefined) {
+  if (!bytes || bytes <= 0) {
+    return "";
+  }
+
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+
+  if (bytes < 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
 export default function NewArticleClient({
@@ -160,6 +190,138 @@ export default function NewArticleClient({
 
   const [error, setError] =
     useState("");
+
+  /*
+   * ============================================================
+   * MAIN IMAGE / MEDIA LIBRARY
+   * ============================================================
+   */
+  const [mainImageId, setMainImageId] =
+    useState<string | null>(null);
+
+  const [mediaOptions, setMediaOptions] =
+    useState<MediaOption[]>([]);
+
+  const [loadingMedia, setLoadingMedia] =
+    useState(false);
+
+  const [uploadingImage, setUploadingImage] =
+    useState(false);
+
+  const imageInputRef =
+    useRef<HTMLInputElement | null>(null);
+
+  /*
+   * Load existing image media from the Media Library.
+   */
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadMedia = async () => {
+      setLoadingMedia(true);
+
+      try {
+        const response = await fetch(
+          "/api/admin/media?type=IMAGE&page=1&pageSize=100",
+          {
+            cache: "no-store",
+          },
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              "Unable to load media from the Media Library.",
+          );
+        }
+
+        /*
+         * Support either `items` or `media`
+         * depending on the API response shape.
+         */
+        const rawItems = Array.isArray(data.items)
+          ? data.items
+          : Array.isArray(data.media)
+            ? data.media
+            : [];
+
+        const imageItems: MediaOption[] =
+          rawItems
+            .filter(
+              (item: {
+                type?: string;
+              }) =>
+                !item.type ||
+                String(item.type).toUpperCase() ===
+                  "IMAGE",
+            )
+            .map(
+              (item: {
+                id?: string;
+                filename?: string;
+                name?: string;
+                url?: string;
+                altText?: string | null;
+                size?: number | null;
+                bytes?: number | null;
+                width?: number | null;
+                height?: number | null;
+              }) => ({
+                id: String(item.id ?? ""),
+                filename:
+                  item.filename ??
+                  item.name ??
+                  "Untitled image",
+                url: item.url ?? "",
+                altText:
+                  item.altText ?? null,
+                size:
+                  item.size ??
+                  item.bytes ??
+                  null,
+                width:
+                  item.width ?? null,
+                height:
+                  item.height ?? null,
+              }),
+            )
+            .filter(
+              (item: MediaOption) =>
+                Boolean(item.id) &&
+                Boolean(item.url),
+            );
+
+        if (!cancelled) {
+          setMediaOptions(imageItems);
+        }
+      } catch (mediaError) {
+        if (!cancelled) {
+          setError(
+            mediaError instanceof Error
+              ? mediaError.message
+              : "Unable to load media.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingMedia(false);
+        }
+      }
+    };
+
+    void loadMedia();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedMainImage =
+    mediaOptions.find(
+      (media) => media.id === mainImageId,
+    ) ?? null;
 
   const updateTranslation = (
     language: Language,
@@ -240,6 +402,151 @@ export default function NewArticleClient({
     }
   };
 
+  /*
+   * ============================================================
+   * MAIN IMAGE UPLOAD
+   * ============================================================
+   */
+  const uploadMainImage = async (
+    file: File,
+  ) => {
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setError(
+        "Please select a valid image file.",
+      );
+      return;
+    }
+
+    if (file.size <= 0) {
+      setError(
+        "The selected image file is empty.",
+      );
+      return;
+    }
+
+    setUploadingImage(true);
+    setError("");
+    setSavedMessage("");
+
+    try {
+      const formData = new FormData();
+
+      formData.append(
+        "file",
+        file,
+      );
+
+      const response = await fetch(
+        "/api/admin/media",
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "Unable to upload the image.",
+        );
+      }
+
+      const uploadedMedia =
+        data.media;
+
+      if (
+        !uploadedMedia ||
+        !uploadedMedia.id ||
+        !uploadedMedia.url
+      ) {
+        throw new Error(
+          "The uploaded image response is invalid.",
+        );
+      }
+
+      const newMedia: MediaOption = {
+        id: String(
+          uploadedMedia.id,
+        ),
+        filename:
+          uploadedMedia.filename ??
+          file.name,
+        url:
+          uploadedMedia.url,
+        altText:
+          uploadedMedia.altText ??
+          null,
+        size:
+          uploadedMedia.size ??
+          file.size,
+        width:
+          uploadedMedia.width ??
+          null,
+        height:
+          uploadedMedia.height ??
+          null,
+      };
+
+      setMediaOptions(
+        (current) => [
+          newMedia,
+          ...current.filter(
+            (media) =>
+              media.id !==
+              newMedia.id,
+          ),
+        ],
+      );
+
+      /*
+       * IMPORTANT:
+       * Automatically select the newly uploaded
+       * image as the article's main image.
+       */
+      setMainImageId(
+        newMedia.id,
+      );
+
+      setSavedMessage(
+        "Image uploaded and selected as the main image.",
+      );
+    } catch (uploadError) {
+      setError(
+        uploadError instanceof Error
+          ? uploadError.message
+          : "Unable to upload the image.",
+      );
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleMainImageFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file =
+      event.target.files?.[0];
+
+    /*
+     * Reset the input so the same file can be
+     * selected again later if needed.
+     */
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    await uploadMainImage(file);
+  };
+
   const getPublishDateValue = () => {
     if (
       !publishDate ||
@@ -283,21 +590,16 @@ export default function NewArticleClient({
           translation,
         ]) => ({
           language,
-
           title:
             translation.title.trim(),
-
           summary:
             translation.summary.trim() ||
             undefined,
-
           content:
             translation.content.trim(),
-
           seoTitle:
             translation.seoTitle.trim() ||
             undefined,
-
           seoDescription:
             translation.seoDescription.trim() ||
             undefined,
@@ -388,7 +690,8 @@ export default function NewArticleClient({
     const selectedCategory =
       initialCategories.find(
         (category) =>
-          category.id === categoryId,
+          category.id ===
+          categoryId,
       );
 
     if (!selectedCategory) {
@@ -405,12 +708,27 @@ export default function NewArticleClient({
     const selectedAuthor =
       initialAuthors.find(
         (author) =>
-          author.id === authorId,
+          author.id ===
+          authorId,
       );
 
     if (!selectedAuthor) {
       setError(
         "The selected author is no longer available. Please refresh the page and select an author again.",
+      );
+      return;
+    }
+
+    /*
+     * If a main image was selected, make sure
+     * it still exists in the loaded Media Library.
+     */
+    if (
+      mainImageId &&
+      !selectedMainImage
+    ) {
+      setError(
+        "The selected main image is no longer available. Please choose another image.",
       );
       return;
     }
@@ -451,6 +769,15 @@ export default function NewArticleClient({
 
             showInLatest:
               showInLatest,
+
+            /*
+             * IMPORTANT:
+             * Save the selected Media Library ID
+             * into Article.mainImageId.
+             */
+            mainImageId:
+              mainImageId ??
+              undefined,
 
             publishedAt:
               status === "PUBLISHED"
@@ -1248,7 +1575,9 @@ export default function NewArticleClient({
 
                   <button
                     type="button"
-                    onClick={addTag}
+                    onClick={
+                      addTag
+                    }
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-pink-50 text-pink-600 transition hover:bg-pink-100"
                     aria-label="Add tag"
                   >
@@ -1306,29 +1635,242 @@ export default function NewArticleClient({
                     </h2>
 
                     <p className="mt-1 text-sm leading-6 text-slate-500">
-                      Media Library integration
-                      will be connected in the
-                      Media CMS step.
+                      Select an image from the Media
+                      Library or upload a new one.
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="p-5">
-                <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-6 text-center">
-                  <ImageIcon
-                    size={28}
-                    className="mx-auto text-slate-300"
-                  />
+              <div className="space-y-4 p-5">
+                {/* Hidden upload input */}
+                <input
+                  ref={
+                    imageInputRef
+                  }
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={
+                    handleMainImageFileChange
+                  }
+                />
 
-                  <p className="mt-3 text-sm font-semibold text-slate-600">
-                    No main image selected
-                  </p>
+                {/* Preview */}
+                {selectedMainImage ? (
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                    <div className="aspect-video w-full overflow-hidden bg-slate-100">
+                      <img
+                        src={
+                          selectedMainImage.url
+                        }
+                        alt={
+                          selectedMainImage.altText ||
+                          selectedMainImage.filename
+                        }
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
 
-                  <p className="mt-1 text-xs leading-5 text-slate-400">
-                    Media Library will be connected
-                    later.
-                  </p>
+                    <div className="space-y-3 p-4">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-800">
+                          {
+                            selectedMainImage.filename
+                          }
+                        </p>
+
+                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
+                          {selectedMainImage.width &&
+                          selectedMainImage.height ? (
+                            <span>
+                              {
+                                selectedMainImage.width
+                              }{" "}
+                              ×{" "}
+                              {
+                                selectedMainImage.height
+                              }
+                            </span>
+                          ) : null}
+
+                          {selectedMainImage.size ? (
+                            <span>
+                              {formatFileSize(
+                                selectedMainImage.size,
+                              )}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <button
+                          type="button"
+                          disabled={
+                            uploadingImage
+                          }
+                          onClick={() =>
+                            imageInputRef.current?.click()
+                          }
+                          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-pink-300 hover:text-pink-600 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <ImageIcon
+                            size={16}
+                          />
+                          Change Image
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMainImageId(
+                              null,
+                            )
+                          }
+                          className="flex items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-100"
+                        >
+                          <X size={16} />
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-6 text-center">
+                    <ImageIcon
+                      size={30}
+                      className="mx-auto text-slate-300"
+                    />
+
+                    <p className="mt-3 text-sm font-semibold text-slate-600">
+                      No main image selected
+                    </p>
+
+                    <p className="mt-1 text-xs leading-5 text-slate-400">
+                      Choose an existing image below
+                      or upload a new image.
+                    </p>
+
+                    <button
+                      type="button"
+                      disabled={
+                        uploadingImage
+                      }
+                      onClick={() =>
+                        imageInputRef.current?.click()
+                      }
+                      className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Plus size={16} />
+                      {uploadingImage
+                        ? "Uploading..."
+                        : "Upload New Image"}
+                    </button>
+                  </div>
+                )}
+
+                {/* Upload / choose buttons */}
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <button
+                    type="button"
+                    disabled={
+                      uploadingImage
+                    }
+                    onClick={() =>
+                      imageInputRef.current?.click()
+                    }
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-pink-300 hover:text-pink-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Plus size={17} />
+                    {uploadingImage
+                      ? "Uploading..."
+                      : "Upload New Image"}
+                  </button>
+                </div>
+
+                {/* Media Library selector */}
+                <div>
+                  <label
+                    htmlFor="mainImage"
+                    className="mb-2 block text-sm font-semibold text-slate-700"
+                  >
+                    Media Library
+                  </label>
+
+                  <div className="relative">
+                    <select
+                      id="mainImage"
+                      value={
+                        mainImageId ?? ""
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setMainImageId(
+                          event.target
+                            .value ||
+                            null,
+                        )
+                      }
+                      disabled={
+                        loadingMedia ||
+                        uploadingImage
+                      }
+                      className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 outline-none transition focus:border-pink-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+                    >
+                      <option value="">
+                        {loadingMedia
+                          ? "Loading images..."
+                          : "Choose an image"}
+                      </option>
+
+                      {mediaOptions.map(
+                        (media) => (
+                          <option
+                            key={
+                              media.id
+                            }
+                            value={
+                              media.id
+                            }
+                          >
+                            {
+                              media.filename
+                            }
+                          </option>
+                        ),
+                      )}
+                    </select>
+
+                    <ChevronDown
+                      size={16}
+                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                  </div>
+
+                  {!loadingMedia &&
+                    mediaOptions.length ===
+                      0 && (
+                      <p className="mt-2 text-xs leading-5 text-slate-400">
+                        No images are currently
+                        available in the Media Library.
+                        Upload an image to use it here.
+                      </p>
+                    )}
+
+                  {!loadingMedia &&
+                    mediaOptions.length >
+                      0 && (
+                      <p className="mt-2 text-xs leading-5 text-slate-400">
+                        {mediaOptions.length} image
+                        {mediaOptions.length ===
+                        1
+                          ? ""
+                          : "s"}{" "}
+                        available in the Media Library.
+                      </p>
+                    )}
                 </div>
               </div>
             </section>

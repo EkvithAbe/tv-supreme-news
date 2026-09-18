@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import CategoryPage from "@/components/category/CategoryPage";
 import { getArticles } from "@/lib/data/articles";
-import { getCategories } from "@/lib/data/categories";
+import { prisma } from "@/lib/prisma";
 
 type PageProps = {
   params: Promise<{
@@ -16,11 +16,14 @@ type SupportedLanguage = "EN" | "SI" | "TA";
 function getLanguage(
   locale: string,
 ): SupportedLanguage {
-  if (locale === "si") {
+  const normalized =
+    locale.trim().toLowerCase();
+
+  if (normalized === "si") {
     return "SI";
   }
 
-  if (locale === "ta") {
+  if (normalized === "ta") {
     return "TA";
   }
 
@@ -34,11 +37,14 @@ export default async function CategoryRoute({
 
   const language = getLanguage(locale);
 
+  const normalizedSlug =
+    slug.trim().toLowerCase();
+
   /*
-   * "latest" is a special route and is not a
-   * database category.
+   * "latest" is a special system route.
+   * It is not a database category.
    */
-  if (slug === "latest") {
+  if (normalizedSlug === "latest") {
     const result = await getArticles({
       language,
       status: "PUBLISHED",
@@ -55,24 +61,34 @@ export default async function CategoryRoute({
   }
 
   /*
-   * All other category routes are resolved directly
-   * from PostgreSQL.
+   * Find the category directly from PostgreSQL.
+   *
+   * Nothing is hardcoded here.
+   * The URL slug comes from the database category slug.
    */
-  const categories =
-    await getCategories(language);
-
-  const category = categories.find(
-    (item) => item.slug === slug,
-  );
+  const category =
+    await prisma.category.findUnique({
+      where: {
+        slug: normalizedSlug,
+      },
+      select: {
+        id: true,
+        slug: true,
+      },
+    });
 
   /*
-   * If the category does not exist in PostgreSQL
-   * for the requested language, return 404.
+   * If PostgreSQL has no category with this slug,
+   * then the route does not exist.
    */
   if (!category) {
     notFound();
   }
 
+  /*
+   * Get published articles for this category
+   * in the requested language.
+   */
   const result = await getArticles({
     language,
     status: "PUBLISHED",

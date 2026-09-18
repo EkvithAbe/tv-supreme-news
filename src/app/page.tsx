@@ -1,5 +1,6 @@
 import Image from "next/image";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
+import { getLocale } from "next-intl/server";
 import type { ElementType } from "react";
 
 import {
@@ -18,6 +19,7 @@ import {
 
 import { getArticles } from "@/lib/data/articles";
 import { getCategories } from "@/lib/data/categories";
+import HeroSlider from "@/components/home/HeroSlider";
 import { prisma } from "@/lib/prisma";
 
 /* =========================================================
@@ -25,6 +27,22 @@ import { prisma } from "@/lib/prisma";
 ========================================================= */
 
 type SupportedLanguage = "EN" | "SI" | "TA";
+
+function getLanguageFromLocale(
+  locale: string,
+): SupportedLanguage {
+  const normalized = locale.toLowerCase();
+
+  if (normalized === "si") {
+    return "SI";
+  }
+
+  if (normalized === "ta") {
+    return "TA";
+  }
+
+  return "EN";
+}
 
 type HomeArticle = {
   id: string;
@@ -193,25 +211,27 @@ function formatDuration(
    LOAD HOMEPAGE DATA
 ========================================================= */
 
-async function getHomepageData() {
+async function getHomepageData(
+  language: SupportedLanguage,
+) {
   const [
     articleResult,
     categoryResult,
     videoRecords,
   ] = await Promise.all([
     getArticles({
-      language: "EN",
+      language,
       status: "PUBLISHED",
       page: 1,
       pageSize: 100,
     }),
 
-    getCategories("EN"),
+    getCategories(language),
 
     prisma.video.findMany({
       where: {
         status: "PUBLISHED",
-        language: "EN",
+        language,
       },
 
       orderBy: [
@@ -324,6 +344,7 @@ async function getHomepageData() {
    * Latest news:
    * newest published articles first.
    */
+
   const latestNews =
     articles
       .filter(
@@ -337,6 +358,7 @@ async function getHomepageData() {
    * first use articles explicitly marked
    * "Show on Homepage".
    */
+
   const homepageArticles =
     articles.filter(
       (article) =>
@@ -348,6 +370,7 @@ async function getHomepageData() {
    * used when homepage articles are
    * not available.
    */
+
   const featuredArticles =
     articles.filter(
       (article) =>
@@ -361,6 +384,7 @@ async function getHomepageData() {
    * 2. Featured
    * 3. Latest published article
    */
+
   const heroStory =
     homepageArticles[0] ??
     featuredArticles[0] ??
@@ -368,11 +392,41 @@ async function getHomepageData() {
     null;
 
   /*
+   * Hero slider stories:
+   * Homepage -> Featured -> Latest.
+   *
+   * Remove duplicates by ID and keep a maximum
+   * of four stories for the slider.
+   */
+  const heroCandidates = [
+    ...homepageArticles,
+    ...featuredArticles,
+    ...articles,
+  ];
+
+  const heroStories: HomeArticle[] = [];
+  const usedHeroStoryIds = new Set<string>();
+
+  for (const article of heroCandidates) {
+    if (usedHeroStoryIds.has(article.id)) {
+      continue;
+    }
+
+    usedHeroStoryIds.add(article.id);
+    heroStories.push(article);
+
+    if (heroStories.length >= 4) {
+      break;
+    }
+  }
+
+  /*
    * Top stories:
    * Homepage -> Featured -> Latest.
    *
    * Remove duplicates by ID.
    */
+
   const topStoryCandidates = [
     ...homepageArticles,
     ...featuredArticles,
@@ -410,6 +464,7 @@ async function getHomepageData() {
    * Trending topics:
    * Build them from real article tags.
    */
+
   const trendingTopics: string[] = [];
 
   const usedTopics =
@@ -456,6 +511,7 @@ async function getHomepageData() {
    * These are interface fallbacks, not
    * article records.
    */
+
   if (
     trendingTopics.length === 0
   ) {
@@ -476,6 +532,7 @@ async function getHomepageData() {
     trendingTopics,
     topStories,
     heroStory,
+    heroStories,
     videos,
   };
 }
@@ -485,14 +542,20 @@ async function getHomepageData() {
 ========================================================= */
 
 export default async function HomePage() {
+  const locale = await getLocale();
+
+  const language =
+    getLanguageFromLocale(locale);
+
   const {
     latestNews,
     categories,
     trendingTopics,
     topStories,
     heroStory,
+    heroStories,
     videos,
-  } = await getHomepageData();
+  } = await getHomepageData(language);
 
   return (
     <main className="bg-white text-[#111d4a]">
@@ -506,122 +569,7 @@ export default async function HomePage() {
               HERO
           ================================================== */}
 
-          <article className="relative overflow-hidden rounded-xl bg-black shadow-sm">
-            {heroStory ? (
-              <div className="relative aspect-[16/9] min-h-[330px] sm:min-h-[400px]">
-                <Image
-                  src={
-                    heroStory.mainImage?.url ??
-                    "/images/home/hero.jpg"
-                  }
-                  alt={
-                    heroStory.mainImage
-                      ?.altText ??
-                    heroStory.title
-                  }
-                  fill
-                  priority
-                  sizes="(max-width: 1024px) 100vw, 67vw"
-                  className="object-cover"
-                />
-
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent" />
-
-                {/* Category */}
-                <span className="absolute left-4 top-4 rounded-md bg-gradient-to-r from-[#ec008c] to-[#6a1b9a] px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white">
-                  {
-                    heroStory.category
-                      ?.name
-                  }
-                </span>
-
-                {/* Previous */}
-                <button
-                  type="button"
-                  aria-label="Previous story"
-                  className="absolute left-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-xl text-white transition hover:bg-black/75"
-                >
-                  ‹
-                </button>
-
-                {/* Next */}
-                <button
-                  type="button"
-                  aria-label="Next story"
-                  className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-xl text-white transition hover:bg-black/75"
-                >
-                  ›
-                </button>
-
-                {/* Hero Content */}
-                <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-6 lg:p-7">
-                  <h1 className="max-w-4xl text-2xl font-extrabold leading-tight text-white sm:text-4xl lg:text-5xl">
-                    {
-                      heroStory.title
-                    }
-                  </h1>
-
-                  {heroStory.summary && (
-                    <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/90 sm:text-base lg:text-lg">
-                      {
-                        heroStory.summary
-                      }
-                    </p>
-                  )}
-
-                  <div className="mt-4 flex flex-wrap items-center gap-4 text-sm font-medium text-white">
-                    <span>
-                      ◷{" "}
-                      {formatTime(
-                        heroStory.publishedAt,
-                      )}
-                    </span>
-
-                    <span>
-                      ◉{" "}
-                      {
-                        heroStory.views
-                      }
-                    </span>
-
-                    <Link
-                      href={`/news/${heroStory.slug}`}
-                      className="ml-auto inline-flex items-center gap-1.5 font-bold text-white transition hover:text-fuchsia-200"
-                    >
-                      Read More
-                      <ArrowRight
-                        size={16}
-                      />
-                    </Link>
-                  </div>
-                </div>
-
-                {/* Hero dots */}
-                <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1.5">
-                  <span className="h-1.5 w-5 rounded-full bg-[#ec008c]" />
-                  <span className="h-1.5 w-1.5 rounded-full bg-white/60" />
-                  <span className="h-1.5 w-1.5 rounded-full bg-white/60" />
-                  <span className="h-1.5 w-1.5 rounded-full bg-white/60" />
-                </div>
-              </div>
-            ) : (
-              <div className="flex aspect-[16/9] min-h-[330px] items-center justify-center text-white sm:min-h-[400px]">
-                <div className="text-center">
-                  <p className="text-sm font-bold uppercase tracking-wide text-white/70">
-                    TV SUPREME
-                  </p>
-
-                  <h1 className="mt-2 text-3xl font-extrabold">
-                    Latest News
-                  </h1>
-
-                  <p className="mt-2 text-sm text-white/70">
-                    No published articles yet.
-                  </p>
-                </div>
-              </div>
-            )}
-          </article>
+          <HeroSlider stories={heroStories} />
 
           {/* =================================================
               LATEST NEWS
@@ -709,13 +657,6 @@ export default async function HomePage() {
           </section>
         </div>
 
-        {/* Slider dots */}
-        <div className="mt-3 flex justify-center gap-1.5">
-          <span className="h-1.5 w-5 rounded-full bg-[#ec008c]" />
-          <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
-          <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
-          <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
-        </div>
       </section>
 
       {/* =====================================================
@@ -1064,7 +1005,7 @@ export default async function HomePage() {
                           story
                             .category
                             ?.slug ??
-                            ""
+                          ""
                         ] ??
                         "/images/home/hero.jpg"
                       }

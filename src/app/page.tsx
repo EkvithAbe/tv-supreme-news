@@ -21,6 +21,7 @@ import { getArticles } from "@/lib/data/articles";
 import { getCategories } from "@/lib/data/categories";
 import HeroSlider from "@/components/home/HeroSlider";
 import { prisma } from "@/lib/prisma";
+import { getLiveTVSettings } from "@/lib/data/live-tv";
 
 /* =========================================================
    TYPES
@@ -218,6 +219,7 @@ async function getHomepageData(
     articleResult,
     categoryResult,
     videoRecords,
+    liveTVSettings,
   ] = await Promise.all([
     getArticles({
       language,
@@ -254,6 +256,8 @@ async function getHomepageData(
         publishedAt: true,
       },
     }),
+
+    getLiveTVSettings(),
   ]);
 
   const articles =
@@ -405,10 +409,14 @@ async function getHomepageData(
   ];
 
   const heroStories: HomeArticle[] = [];
-  const usedHeroStoryIds = new Set<string>();
+
+  const usedHeroStoryIds =
+    new Set<string>();
 
   for (const article of heroCandidates) {
-    if (usedHeroStoryIds.has(article.id)) {
+    if (
+      usedHeroStoryIds.has(article.id)
+    ) {
       continue;
     }
 
@@ -534,6 +542,7 @@ async function getHomepageData(
     heroStory,
     heroStories,
     videos,
+    liveTVSettings,
   };
 }
 
@@ -555,6 +564,7 @@ export default async function HomePage() {
     heroStory,
     heroStories,
     videos,
+  liveTVSettings,
   } = await getHomepageData(language);
 
   return (

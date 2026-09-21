@@ -141,15 +141,87 @@ function getLanguageFromLocale(
 }
 
 /* =========================================================
-   URL HELPERS
+   FOOTER LINK FALLBACK
+   Normal footer links are loaded from Admin → Footer.
+   These five are used only if the API is unavailable.
 ========================================================= */
 
-function isExternalUrl(
+const fallbackFooterLinks: FooterLink[] = [
+  {
+    id: "footer-about",
+    label: "About Us",
+    href: "/about",
+    position: 0,
+    openNewTab: false,
+  },
+  {
+    id: "footer-contact",
+    label: "Contact Us",
+    href: "/contact",
+    position: 1,
+    openNewTab: false,
+  },
+  {
+    id: "footer-advertise",
+    label: "Advertise",
+    href: "/advertise",
+    position: 2,
+    openNewTab: false,
+  },
+  {
+    id: "footer-privacy",
+    label: "Privacy Policy",
+    href: "/legal/privacy-policy",
+    position: 3,
+    openNewTab: false,
+  },
+  {
+    id: "footer-terms",
+    label: "Terms of Use",
+    href: "/legal/terms-of-use",
+    position: 4,
+    openNewTab: false,
+  },
+];
+
+/* =========================================================
+   LOCALIZED FOOTER URL
+   Admin stores one canonical internal path.
+   The public footer prefixes the active locale.
+========================================================= */
+
+function getFooterHref(
   href: string,
-): boolean {
-  return /^https?:\/\//i.test(
-    href.trim(),
+  locale: Locale,
+): string {
+  const trimmed = href.trim();
+
+  if (!trimmed) {
+    return "#";
+  }
+
+  if (
+    /^(https?:\/\/|mailto:|tel:)/i.test(
+      trimmed,
+    )
+  ) {
+    return trimmed;
+  }
+
+  let normalized = trimmed.startsWith("/")
+    ? trimmed
+    : `/${trimmed}`;
+
+  normalized = normalized.replace(
+    /^\/(en|si|ta)(?=\/|$)/i,
+    "",
   );
+
+  if (!normalized) {
+    return `/${locale}`;
+  }
+
+  return `/${locale}${normalized}`;
 }
 
 /* =========================================================
@@ -483,30 +555,28 @@ export default function Footer() {
 
   /* =======================================================
      FOOTER LINKS
+     Loaded from the Public Footer API.
+     The API returns the label for the active language.
   ======================================================== */
 
-  const visibleLinks =
-    useMemo(() => {
-      return [
-        ...footer.links,
-      ]
-        .filter(
-          (link) =>
-            Boolean(
-              link.label?.trim(),
-            ) &&
-            Boolean(
-              link.href?.trim(),
-            ),
-        )
-        .sort(
-          (a, b) =>
-            a.position -
-            b.position,
-        );
-    }, [
-      footer.links,
-    ]);
+  const visibleLinks = useMemo(() => {
+    const links = Array.isArray(footer.links)
+      ? footer.links
+          .filter(
+            (link) =>
+              Boolean(link.label?.trim()) &&
+              Boolean(link.href?.trim()),
+          )
+          .sort(
+            (a, b) =>
+              a.position - b.position,
+          )
+      : [];
+
+    return links.length > 0
+      ? links
+      : fallbackFooterLinks;
+  }, [footer.links]);
 
   /* =======================================================
      BACK TO TOP
@@ -684,59 +754,40 @@ export default function Footer() {
               <span className="text-sm text-slate-400">
                 Loading...
               </span>
-            ) : visibleLinks.length >
-              0 ? (
+            ) : (
               visibleLinks.map(
-                (
-                  link,
-                  index,
-                ) => (
-                  <div
-                    key={
-                      link.id
-                    }
-                    className="
-                      flex
-                      items-center
-                      gap-4
-                    "
-                  >
-
-                    {isExternalUrl(
+                (link, index) => {
+                  const href =
+                    getFooterHref(
                       link.href,
-                    ) ? (
+                      locale,
+                    );
+
+                  const external =
+                    /^(https?:\/\/|mailto:|tel:)/i.test(
+                      href,
+                    );
+
+                  return (
+                    <div
+                      key={link.id}
+                      className="
+                        flex
+                        items-center
+                        gap-4
+                      "
+                    >
                       <a
-                        href={
-                          link.href
-                        }
+                        href={href}
                         target={
-                          link.openNewTab
+                          external || link.openNewTab
                             ? "_blank"
                             : undefined
                         }
                         rel={
-                          link.openNewTab
+                          external || link.openNewTab
                             ? "noopener noreferrer"
                             : undefined
-                        }
-                        className="
-                          whitespace-nowrap
-                          text-[15px]
-                          font-semibold
-                          text-slate-600
-                          transition
-                          hover:text-[#ec008c]
-                          sm:text-[16px]
-                        "
-                      >
-                        {
-                          link.label
-                        }
-                      </a>
-                    ) : (
-                      <Link
-                        href={
-                          link.href
                         }
                         className="
                           whitespace-nowrap
@@ -750,35 +801,27 @@ export default function Footer() {
                           dark:hover:text-[#ec008c]
                         "
                       >
-                        {
-                          link.label
-                        }
-                      </Link>
-                    )}
+                        {link.label}
+                      </a>
 
-                    {index <
-                      visibleLinks.length -
-                        1 && (
-                      <span
-                        aria-hidden="true"
-                        className="
-                          text-[16px]
-                          font-medium
-                          text-slate-300
-                          dark:text-slate-600
-                        "
-                      >
-                        |
-                      </span>
-                    )}
-
-                  </div>
-                ),
+                      {index <
+                        visibleLinks.length - 1 && (
+                        <span
+                          aria-hidden="true"
+                          className="
+                            text-[16px]
+                            font-medium
+                            text-slate-300
+                            dark:text-slate-600
+                          "
+                        >
+                          |
+                        </span>
+                      )}
+                    </div>
+                  );
+                },
               )
-            ) : (
-              <span className="text-sm text-slate-400">
-                No footer links configured.
-              </span>
             )}
 
           </nav>
@@ -1079,50 +1122,72 @@ export default function Footer() {
             "
           >
 
-            {visibleLinks.some(
-              (link) =>
+            {visibleLinks
+              .filter((link) =>
                 link.href.includes(
                   "/legal/privacy-policy",
                 ),
-            ) && (
-              <Link
-                href="/legal/privacy-policy"
-                className="text-slate-500 transition hover:text-[#ec008c] dark:text-slate-400"
-              >
-                Privacy Policy
-              </Link>
-            )}
+              )
+              .slice(0, 1)
+              .map((link) => (
+                <a
+                  key={link.id}
+                  href={getFooterHref(
+                    link.href,
+                    locale,
+                  )}
+                  className="
+                    text-slate-500
+                    transition
+                    hover:text-[#ec008c]
+                    dark:text-slate-400
+                    dark:hover:text-[#ec008c]
+                  "
+                >
+                  {link.label}
+                </a>
+              ))}
 
-            {visibleLinks.some(
-              (link) =>
-                link.href.includes(
-                  "/legal/privacy-policy",
-                ),
+            {visibleLinks.some((link) =>
+              link.href.includes(
+                "/legal/privacy-policy",
+              ),
             ) &&
-              visibleLinks.some(
-                (link) =>
-                  link.href.includes(
-                    "/legal/terms-of-use",
-                  ),
+              visibleLinks.some((link) =>
+                link.href.includes(
+                  "/legal/terms-of-use",
+                ),
               ) && (
                 <span className="text-slate-300 dark:text-slate-600">
                   |
                 </span>
               )}
 
-            {visibleLinks.some(
-              (link) =>
+            {visibleLinks
+              .filter((link) =>
                 link.href.includes(
                   "/legal/terms-of-use",
                 ),
-            ) && (
-              <Link
-                href="/legal/terms-of-use"
-                className="text-slate-500 transition hover:text-[#ec008c] dark:text-slate-400"
-              >
-                Terms of Use
-              </Link>
-            )}
+              )
+              .slice(0, 1)
+              .map((link) => (
+                <a
+                  key={link.id}
+                  href={getFooterHref(
+                    link.href,
+                    locale,
+                  )}
+                  className="
+                    text-slate-500
+                    transition
+                    hover:text-[#ec008c]
+                    dark:text-slate-400
+                    dark:hover:text-[#ec008c]
+                  "
+                >
+                  {link.label}
+                </a>
+              ))}
 
           </div>
 

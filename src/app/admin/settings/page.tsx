@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Bell,
   Check,
@@ -37,6 +37,7 @@ type SettingsState = {
 
   theme: ThemeMode;
   primaryColor: string;
+  logoUrl: string;
 
   facebook: string;
   youtube: string;
@@ -54,6 +55,12 @@ type SettingsState = {
   emailNotifications: boolean;
 };
 
+type SettingsApiResponse = {
+  success: boolean;
+  settings?: SettingsState;
+  message?: string;
+};
+
 /* ===============================================================
    INITIAL SETTINGS
 ================================================================ */
@@ -67,6 +74,7 @@ const initialSettings: SettingsState = {
 
   theme: "System",
   primaryColor: "#EC008C",
+  logoUrl: "/logo.png",
 
   facebook: "https://facebook.com/tvsupreme",
   youtube: "https://youtube.com/@tvsupreme",
@@ -94,10 +102,18 @@ export default function SettingsPage() {
   const [settings, setSettings] =
     useState<SettingsState>(initialSettings);
 
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [apiError, setApiError] = useState("");
 
   const [showResetModal, setShowResetModal] =
+    useState(false);
+
+  const logoInputRef =
+    useRef<HTMLInputElement | null>(null);
+
+  const [uploadingLogo, setUploadingLogo] =
     useState(false);
 
   const updateSetting = <K extends keyof SettingsState>(
@@ -108,25 +124,308 @@ export default function SettingsPage() {
       ...current,
       [key]: value,
     }));
+
+    setSaved(false);
+    setApiError("");
   };
 
-  const saveSettings = () => {
-    setSaving(true);
-    setSaved(false);
+  const loadSettings = async () => {
+    try {
+      setLoading(true);
+      setApiError("");
 
-    window.setTimeout(() => {
-      setSaving(false);
+      const response = await fetch(
+        "/api/admin/settings",
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
+
+      const data: SettingsApiResponse =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data.success ||
+        !data.settings
+      ) {
+        throw new Error(
+          data.message ||
+            "Failed to load settings."
+        );
+      }
+
+      setSettings({
+        ...initialSettings,
+        ...data.settings,
+      });
+    } catch (error) {
+      console.error(
+        "Failed to load settings:",
+        error
+      );
+
+      setApiError(
+        error instanceof Error
+          ? error.message
+          : "Failed to load settings."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadSettings();
+  }, []);
+
+  const saveSettings = async () => {
+    if (saving) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setSaved(false);
+      setApiError("");
+
+      const response = await fetch(
+        "/api/admin/settings",
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify(settings),
+        }
+      );
+
+      const data: SettingsApiResponse =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data.success ||
+        !data.settings
+      ) {
+        throw new Error(
+          data.message ||
+            "Failed to save settings."
+        );
+      }
+
+      setSettings({
+        ...initialSettings,
+        ...data.settings,
+      });
+
+      /*
+       * The Settings page controls the PUBLIC website theme.
+       * Keep this separate from the Admin CMS theme.
+       *
+       * Store the public theme mode locally as well so that
+       * another public tab can react to the change, and emit
+       * an event for an already-mounted public ThemeProvider.
+       */
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("tv-supreme-theme");
+
+        localStorage.setItem(
+          "tv-supreme-public-theme-mode",
+          data.settings.theme
+        );
+
+        window.dispatchEvent(
+          new CustomEvent(
+            "tv-supreme-settings-updated",
+            {
+              detail: {
+                theme: data.settings.theme,
+                primaryColor:
+                  data.settings.primaryColor,
+                logoUrl:
+                  data.settings.logoUrl,
+              },
+            }
+          )
+        );
+      }
+
       setSaved(true);
 
       window.setTimeout(() => {
         setSaved(false);
       }, 2500);
-    }, 800);
+    } catch (error) {
+      console.error(
+        "Failed to save settings:",
+        error
+      );
+
+      setApiError(
+        error instanceof Error
+          ? error.message
+          : "Failed to save settings."
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const resetSettings = () => {
-    setSettings(initialSettings);
-    setShowResetModal(false);
+  const uploadLogo = async (file: File) => {
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setApiError("Please select a valid image file for the logo.");
+      return;
+    }
+
+    if (file.size <= 0) {
+      setApiError("The selected logo file is empty.");
+      return;
+    }
+
+    try {
+      setUploadingLogo(true);
+      setSaved(false);
+      setApiError("");
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch(
+        "/api/admin/media",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success || !data.media?.url) {
+        throw new Error(
+          data.message ||
+            data.error ||
+            "Failed to upload the logo."
+        );
+      }
+
+      updateSetting(
+        "logoUrl",
+        String(data.media.url)
+      );
+    } catch (error) {
+      console.error(
+        "Failed to upload logo:",
+        error
+      );
+
+      setApiError(
+        error instanceof Error
+          ? error.message
+          : "Failed to upload the logo."
+      );
+    } finally {
+      setUploadingLogo(false);
+
+      if (logoInputRef.current) {
+        logoInputRef.current.value = "";
+      }
+    }
+  };
+
+  const resetSettings = async () => {
+    try {
+      setSaving(true);
+      setSaved(false);
+      setApiError("");
+
+      const response = await fetch(
+        "/api/admin/settings",
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify(
+            initialSettings
+          ),
+        }
+      );
+
+      const data: SettingsApiResponse =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data.success ||
+        !data.settings
+      ) {
+        throw new Error(
+          data.message ||
+            "Failed to reset settings."
+        );
+      }
+
+      setSettings({
+        ...initialSettings,
+        ...data.settings,
+      });
+
+      /*
+       * Reset also updates the PUBLIC website theme.
+       * The Admin CMS remains independent.
+       */
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("tv-supreme-theme");
+
+        localStorage.setItem(
+          "tv-supreme-public-theme-mode",
+          data.settings.theme
+        );
+
+        window.dispatchEvent(
+          new CustomEvent(
+            "tv-supreme-settings-updated",
+            {
+              detail: {
+                theme: data.settings.theme,
+                primaryColor:
+                  data.settings.primaryColor,
+                logoUrl:
+                  data.settings.logoUrl,
+              },
+            }
+          )
+        );
+      }
+
+      setShowResetModal(false);
+      setSaved(true);
+
+      window.setTimeout(() => {
+        setSaved(false);
+      }, 2500);
+    } catch (error) {
+      console.error(
+        "Failed to reset settings:",
+        error
+      );
+
+      setApiError(
+        error instanceof Error
+          ? error.message
+          : "Failed to reset settings."
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -162,7 +461,7 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={saveSettings}
-            disabled={saving}
+            disabled={saving || loading}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saved ? (
@@ -179,6 +478,20 @@ export default function SettingsPage() {
           </button>
         </div>
       </div>
+
+      {apiError && (
+        <div className="flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 sm:flex-row sm:items-center sm:justify-between">
+          <span>{apiError}</span>
+
+          <button
+            type="button"
+            onClick={() => void loadSettings()}
+            className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-red-600 shadow-sm ring-1 ring-red-200 transition hover:bg-red-50"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* =========================================================
           STATUS SUMMARY
@@ -375,8 +688,13 @@ export default function SettingsPage() {
             <div className="space-y-5 p-5">
               {/* Theme */}
               <div>
-                <p className="mb-3 text-sm font-semibold text-slate-700">
+                <p className="mb-1 text-sm font-semibold text-slate-700">
                   Website Theme
+                </p>
+
+                <p className="mb-3 text-xs leading-5 text-slate-400">
+                  This controls the public TV SUPREME website. The Admin CMS stays in light mode.
+                  Save Settings to apply the new default.
                 </p>
 
                 <div className="grid gap-3 sm:grid-cols-3">
@@ -473,28 +791,64 @@ export default function SettingsPage() {
                 </p>
 
                 <div className="flex flex-col gap-4 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-5 sm:flex-row sm:items-center">
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-pink-600 to-purple-600 text-lg font-black text-white shadow-md">
-                    TV
+                  <div className="flex h-16 w-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    {settings.logoUrl ? (
+                      <img
+                        src={settings.logoUrl}
+                        alt={`${settings.siteName || "TV SUPREME"} logo`}
+                        className="max-h-full max-w-full object-contain p-2"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-pink-600 to-purple-600 text-lg font-black text-white">
+                        TV
+                      </div>
+                    )}
                   </div>
 
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-slate-700">
-                      TV SUPREME Logo
+                      {settings.siteName || "TV SUPREME"} Logo
                     </p>
 
                     <p className="mt-1 text-xs leading-5 text-slate-400">
-                      Logo upload will connect to the Media Library
-                      later.
+                      Upload an image from your computer. It will be added to the
+                      Media Library and saved as the public website logo when you save settings.
                     </p>
+
+                    {settings.logoUrl && (
+                      <p className="mt-2 truncate text-[11px] text-slate-400">
+                        {settings.logoUrl}
+                      </p>
+                    )}
                   </div>
 
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-                  >
-                    <ImageIcon size={15} />
-                    Choose Logo
-                  </button>
+                  <div className="flex shrink-0 gap-2">
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+
+                        if (file) {
+                          void uploadLogo(file);
+                        }
+                      }}
+                    />
+
+                    <button
+                      type="button"
+                      disabled={uploadingLogo}
+                      onClick={() =>
+                        logoInputRef.current?.click()
+                      }
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <ImageIcon size={15} />
+                      {uploadingLogo ? "Uploading..." : "Choose Logo"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -894,7 +1248,7 @@ export default function SettingsPage() {
               </p>
 
               <p className="text-xs text-slate-400">
-                Changes are currently stored in local UI state.
+                Changes are loaded from and saved to PostgreSQL.
               </p>
             </div>
           </div>
@@ -902,7 +1256,7 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={saveSettings}
-            disabled={saving}
+            disabled={saving || loading}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saved ? (

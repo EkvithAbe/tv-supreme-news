@@ -2300,83 +2300,121 @@ export default function VideosPage() {
               </div>
 
               {/* Thumbnail */}
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
-                  Thumbnail
-                </label>
+            {/* Thumbnail */}
+<div>
+  <label className="mb-2 block text-sm font-semibold text-slate-700">
+    Thumbnail
+  </label>
 
-                {thumbnails.length >
-                0 ? (
-                  <>
-                    <div className="grid max-h-[250px] grid-cols-3 gap-3 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-4">
-                      {thumbnails.map(
-                        (
-                          item: ThumbnailOption,
-                        ) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() =>
-                              setThumbnailId(
-                                item.id,
-                              )
-                            }
-                            className={`relative aspect-video overflow-hidden rounded-xl border-2 transition ${
-                              thumbnailId ===
-                              item.id
-                                ? "border-pink-500 ring-2 ring-pink-100"
-                                : "border-transparent hover:border-pink-200"
-                            }`}
-                            title={
-                              item.name
-                            }
-                          >
-                            <img
-                              src={
-                                item.url
-                              }
-                              alt={
-                                item.name
-                              }
-                              className="h-full w-full object-cover"
-                            />
+  {/* Currently selected thumbnail */}
+  {thumbnailId && (
+    <div className="mb-3 flex items-center gap-3 rounded-2xl border border-pink-200 bg-pink-50 p-3">
+      <div className="relative h-20 w-32 shrink-0 overflow-hidden rounded-xl bg-slate-100">
+        {(() => {
+          const selectedThumbnail =
+            thumbnails.find(
+              (item: ThumbnailOption) =>
+                item.id === thumbnailId,
+            );
 
-                            {thumbnailId ===
-                              item.id && (
-                              <div className="absolute inset-0 flex items-center justify-center bg-pink-600/20">
-                                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-600 text-white">
-                                  ✓
-                                </span>
-                              </div>
-                            )}
-                          </button>
-                        ),
-                      )}
-                    </div>
+          return selectedThumbnail ? (
+            <img
+              src={selectedThumbnail.url}
+              alt={selectedThumbnail.name}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">
+              Thumbnail
+            </div>
+          );
+        })()}
+      </div>
 
-                    <p className="mt-2 text-xs text-slate-400">
-                      Select an image from the
-                      Media Library.
-                    </p>
-                  </>
-                ) : (
-                  <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-6 text-center">
-                    <FileVideo
-                      size={26}
-                      className="mx-auto text-slate-300"
-                    />
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-semibold uppercase tracking-wide text-pink-600">
+          Selected Thumbnail
+        </p>
 
-                    <p className="mt-2 text-sm font-semibold text-slate-600">
-                      No image media available
-                    </p>
+        <p className="mt-1 truncate text-sm font-medium text-slate-700">
+          {thumbnails.find(
+            (item: ThumbnailOption) =>
+              item.id === thumbnailId,
+          )?.name || "Selected image"}
+        </p>
 
-                    <p className="mt-1 text-xs text-slate-400">
-                      Upload an image in Media
-                      Library first.
-                    </p>
-                  </div>
-                )}
-              </div>
+        <button
+          type="button"
+          onClick={() => setThumbnailId("")}
+          className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+        >
+          <X size={13} />
+          Remove Thumbnail
+        </button>
+      </div>
+    </div>
+  )}
+
+  {thumbnails.length > 0 ? (
+    <>
+      <div className="grid max-h-[250px] grid-cols-3 gap-3 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-4">
+        {thumbnails.map(
+          (
+            item: ThumbnailOption,
+          ) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() =>
+                setThumbnailId(item.id)
+              }
+              className={`relative aspect-video overflow-hidden rounded-xl border-2 transition ${
+                thumbnailId === item.id
+                  ? "border-pink-500 ring-2 ring-pink-100"
+                  : "border-transparent hover:border-pink-200"
+              }`}
+              title={item.name}
+            >
+              <img
+                src={item.url}
+                alt={item.name}
+                className="h-full w-full object-cover"
+              />
+
+              {thumbnailId === item.id && (
+                <div className="absolute inset-0 flex items-center justify-center bg-pink-600/20">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-600 text-white">
+                    ✓
+                  </span>
+                </div>
+              )}
+            </button>
+          ),
+        )}
+      </div>
+
+      <p className="mt-2 text-xs text-slate-400">
+        Select an image from the Media Library.
+        You can remove the selected thumbnail at any time.
+      </p>
+    </>
+  ) : (
+    <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-6 text-center">
+      <FileVideo
+        size={26}
+        className="mx-auto text-slate-300"
+      />
+
+      <p className="mt-2 text-sm font-semibold text-slate-600">
+        No image media available
+      </p>
+
+      <p className="mt-1 text-xs text-slate-400">
+        Upload an image in Media Library first.
+      </p>
+    </div>
+  )}
+</div>
 
               {/* Featured */}
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">

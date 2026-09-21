@@ -1,6 +1,14 @@
 @import "tailwindcss";
 
 /* =========================================================
+   TAILWIND DARK MODE
+   The "dark" class is scoped to the public-site wrapper.
+   This prevents the Admin CMS from inheriting public dark mode.
+========================================================= */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* =========================================================
    TV SUPREME DESIGN TOKENS
 ========================================================= */
 
@@ -27,7 +35,16 @@
   --tv-shadow: 0 4px 18px rgba(17, 29, 74, 0.05);
 }
 
-html.dark {
+/* =========================================================
+   PUBLIC DARK MODE VARIABLES
+
+   IMPORTANT:
+   Do NOT use html.dark here.
+
+   ThemeProvider places .dark on the public-site wrapper.
+========================================================= */
+
+.dark {
   --tv-text: #f4f6ff;
   --tv-heading: #ffffff;
   --tv-muted: #a9b1c7;
@@ -42,6 +59,9 @@ html.dark {
   --tv-divider: #282f45;
 
   --tv-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+
+  background-color: var(--tv-bg);
+  color: var(--tv-text);
 }
 
 /* =========================================================
@@ -58,6 +78,7 @@ html {
 
 body {
   margin: 0;
+
   background: var(--tv-bg);
   color: var(--tv-text);
 
@@ -93,6 +114,16 @@ button {
 img {
   max-width: 100%;
   display: block;
+}
+
+/* =========================================================
+   PUBLIC THEME WRAPPER
+========================================================= */
+
+.dark {
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
 }
 
 /* =========================================================
@@ -202,10 +233,10 @@ img {
    DARK MODE OVERRIDES
 ========================================================= */
 
-.dark body {
-  background: var(--tv-bg);
-  color: var(--tv-text);
-}
+/*
+  These rules only activate inside the public .dark wrapper.
+  Admin is not inside .dark, so Admin remains light.
+*/
 
 .dark .bg-white {
   background-color: var(--tv-surface) !important;
@@ -232,6 +263,32 @@ img {
   color: var(--tv-muted) !important;
 }
 
+.dark .text-slate-600 {
+  color: var(--tv-text) !important;
+}
+
+.dark .text-slate-700 {
+  color: var(--tv-text) !important;
+}
+
+.dark .text-slate-800 {
+  color: var(--tv-heading) !important;
+}
+
+.dark .text-slate-900 {
+  color: var(--tv-heading) !important;
+}
+
+.dark .bg-gray-50,
+.dark .bg-slate-100 {
+  background-color: var(--tv-soft) !important;
+}
+
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--tv-divider) !important;
+}
+
 /* =========================================================
    FORM CONTROLS
 ========================================================= */
@@ -247,6 +304,60 @@ img {
 .dark input::placeholder,
 .dark textarea::placeholder {
   color: var(--tv-muted);
+}
+
+/* =========================================================
+   FORM CONTROL FOCUS
+========================================================= */
+
+.dark input:focus,
+.dark textarea:focus,
+.dark select:focus {
+  border-color: var(--tv-pink);
+}
+
+/* =========================================================
+   PUBLIC DARK BACKGROUNDS
+========================================================= */
+
+.dark .bg-\[\#ffffff\] {
+  background-color: var(--tv-surface) !important;
+}
+
+.dark .bg-\[\#f7f8fc\] {
+  background-color: var(--tv-soft) !important;
+}
+
+.dark .bg-\[\#f6f2ff\] {
+  background-color: var(--tv-soft-purple) !important;
+}
+
+.dark .bg-\[\#fff1f8\] {
+  background-color: var(--tv-soft-pink) !important;
+}
+
+/* =========================================================
+   PUBLIC DARK BORDERS
+========================================================= */
+
+.dark .border-\[\#e3e7f0\] {
+  border-color: var(--tv-border) !important;
+}
+
+.dark .border-\[\#edf0f5\] {
+  border-color: var(--tv-divider) !important;
+}
+
+/* =========================================================
+   PUBLIC DARK TEXT
+========================================================= */
+
+.dark .text-\[\#101b4f\] {
+  color: var(--tv-heading) !important;
+}
+
+.dark .text-\[\#69748c\] {
+  color: var(--tv-muted) !important;
 }
 
 /* =========================================================

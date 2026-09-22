@@ -6,7 +6,11 @@ import {
   useState,
 } from "react";
 
-import { Loader2, Play, Radio } from "lucide-react";
+import {
+  Loader2,
+  Play,
+  Radio,
+} from "lucide-react";
 
 type LiveTVSettings = {
   channelName: string;
@@ -25,6 +29,10 @@ type Props = {
   compact?: boolean;
 };
 
+/* =========================================================
+   PLAYER URL
+========================================================= */
+
 function getPlayerUrl(
   settings: LiveTVSettings | null,
 ): string {
@@ -39,21 +47,139 @@ function getPlayerUrl(
   );
 }
 
-function isHostedPlayerUrl(url: string): boolean {
-  const normalized = url.toLowerCase();
+/* =========================================================
+   AUTOPLAY EMBED URL
+========================================================= */
+
+function getAutoplayEmbedUrl(
+  url: string,
+): string {
+  try {
+    const parsed = new URL(url);
+
+    const hostname =
+      parsed.hostname.toLowerCase();
+
+    /*
+     * Castr
+     *
+     * Castr documents:
+     * autoplay=on
+     * muted=on
+     */
+    if (
+      hostname.includes("player.castr.com")
+    ) {
+      parsed.searchParams.set(
+        "autoplay",
+        "on",
+      );
+
+      parsed.searchParams.set(
+        "muted",
+        "on",
+      );
+
+      return parsed.toString();
+    }
+
+    /*
+     * YouTube
+     */
+    if (
+      hostname.includes("youtube.com") ||
+      hostname.includes(
+        "youtube-nocookie.com",
+      )
+    ) {
+      parsed.searchParams.set(
+        "autoplay",
+        "1",
+      );
+
+      parsed.searchParams.set(
+        "mute",
+        "1",
+      );
+
+      return parsed.toString();
+    }
+
+    /*
+     * Vimeo
+     */
+    if (
+      hostname.includes(
+        "player.vimeo.com",
+      )
+    ) {
+      parsed.searchParams.set(
+        "autoplay",
+        "1",
+      );
+
+      parsed.searchParams.set(
+        "muted",
+        "1",
+      );
+
+      return parsed.toString();
+    }
+
+    /*
+     * Generic embed provider
+     */
+    parsed.searchParams.set(
+      "autoplay",
+      "1",
+    );
+
+    parsed.searchParams.set(
+      "muted",
+      "1",
+    );
+
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
+/* =========================================================
+   HOSTED PLAYER DETECTION
+========================================================= */
+
+function isHostedPlayerUrl(
+  url: string,
+): boolean {
+  const normalized =
+    url.toLowerCase();
 
   return (
-    normalized.includes("player.castr.com") ||
-    normalized.includes("youtube.com/embed") ||
+    normalized.includes(
+      "player.castr.com",
+    ) ||
+    normalized.includes(
+      "youtube.com/embed",
+    ) ||
     normalized.includes(
       "youtube-nocookie.com/embed",
     ) ||
-    normalized.includes("player.vimeo.com")
+    normalized.includes(
+      "player.vimeo.com",
+    )
   );
 }
 
-function isHlsUrl(url: string): boolean {
-  const normalized = url.toLowerCase();
+/* =========================================================
+   HLS DETECTION
+========================================================= */
+
+function isHlsUrl(
+  url: string,
+): boolean {
+  const normalized =
+    url.toLowerCase();
 
   return (
     normalized.includes(".m3u8") ||
@@ -66,17 +192,45 @@ function isHlsUrl(url: string): boolean {
   );
 }
 
+/* =========================================================
+   COMPONENT
+========================================================= */
+
 export default function LiveTVPlayer({
   settings,
   poster = "/images/home/live-tv.jpg",
   compact = false,
 }: Props) {
   const videoRef =
-    useRef<HTMLVideoElement | null>(null);
+    useRef<HTMLVideoElement | null>(
+      null,
+    );
 
   const hlsRef = useRef<{
     destroy: () => void;
   } | null>(null);
+
+  /*
+   * This wrapper is used only for the
+   * Home page compact player.
+   */
+  const embedContainerRef =
+    useRef<HTMLDivElement | null>(
+      null,
+    );
+
+  /*
+   * For the Home page, wait until the player
+   * is near the viewport before creating the
+   * third-party iframe.
+   *
+   * Watch Live page keeps the original
+   * immediate loading behavior.
+   */
+  const [
+    shouldLoadEmbed,
+    setShouldLoadEmbed,
+  ] = useState(!compact);
 
   const [isLoading, setIsLoading] =
     useState(false);
@@ -116,9 +270,81 @@ export default function LiveTVPlayer({
     !hostedPlayer;
 
   /*
-   * Clean up HLS whenever the URL changes
-   * or the component unmounts.
+   * Build the actual URL used by the iframe.
    */
+  const autoplayPlayerUrl =
+    hostedPlayer && autoPlay
+      ? getAutoplayEmbedUrl(
+          playerUrl,
+        )
+      : playerUrl;
+
+  /* =======================================================
+     INTERSECTION OBSERVER FOR HOME EMBED
+  ======================================================== */
+
+  useEffect(() => {
+    /*
+     * Nothing to observe when:
+     *
+     * - this is not a hosted player
+     * - this is not the compact Home player
+     */
+    if (
+      !hostedPlayer ||
+      !compact
+    ) {
+      setShouldLoadEmbed(true);
+      return;
+    }
+
+    const element =
+      embedContainerRef.current;
+
+    if (!element) {
+      return;
+    }
+
+    /*
+     * Start loading a little before the player
+     * enters the visible screen.
+     */
+    const observer =
+      new IntersectionObserver(
+        (entries) => {
+          const entry =
+            entries[0];
+
+          if (
+            entry?.isIntersecting
+          ) {
+            setShouldLoadEmbed(true);
+
+            observer.disconnect();
+          }
+        },
+        {
+          root: null,
+          rootMargin:
+            "300px 0px",
+          threshold: 0.01,
+        },
+      );
+
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [
+    hostedPlayer,
+    compact,
+  ]);
+
+  /* =======================================================
+     CLEANUP HLS
+  ======================================================== */
+
   useEffect(() => {
     return () => {
       if (hlsRef.current) {
@@ -128,12 +354,10 @@ export default function LiveTVPlayer({
     };
   }, []);
 
-  /*
-   * Attach HLS.js for direct .m3u8 streams.
-   *
-   * Native HLS is used on browsers that support it.
-   * Chrome/Edge/Firefox use HLS.js when supported.
-   */
+  /* =======================================================
+     HLS PLAYER
+  ======================================================== */
+
   useEffect(() => {
     if (
       hostedPlayer ||
@@ -158,7 +382,7 @@ export default function LiveTVPlayer({
         setIsLoading(true);
 
         /*
-         * Safari/iOS can often play HLS natively.
+         * Safari / iOS native HLS
          */
         if (
           video.canPlayType(
@@ -175,8 +399,8 @@ export default function LiveTVPlayer({
               await video.play();
             } catch {
               /*
-               * Browser autoplay policy may block
-               * playback. The controls remain available.
+               * Browser autoplay policy
+               * may block playback.
                */
             }
           }
@@ -189,7 +413,7 @@ export default function LiveTVPlayer({
         }
 
         /*
-         * Other modern browsers use HLS.js.
+         * HLS.js
          */
         const hlsModule =
           await import("hls.js");
@@ -205,15 +429,17 @@ export default function LiveTVPlayer({
           setPlayerError(
             "This browser cannot play the HLS stream.",
           );
+
           setIsLoading(false);
           return;
         }
 
-        const hls = new Hls({
-          enableWorker: true,
-          lowLatencyMode: true,
-          backBufferLength: 30,
-        });
+        const hls =
+          new Hls({
+            enableWorker: true,
+            lowLatencyMode: true,
+            backBufferLength: 30,
+          });
 
         hlsRef.current = hls;
 
@@ -241,6 +467,7 @@ export default function LiveTVPlayer({
             }
 
             hlsRef.current = null;
+
             setIsLoading(false);
           },
         );
@@ -266,7 +493,10 @@ export default function LiveTVPlayer({
           },
         );
 
-        hls.loadSource(playerUrl);
+        hls.loadSource(
+          playerUrl,
+        );
+
         hls.attachMedia(video);
       } catch (error) {
         if (cancelled) {
@@ -301,7 +531,9 @@ export default function LiveTVPlayer({
 
       if (video) {
         video.pause();
-        video.removeAttribute("src");
+        video.removeAttribute(
+          "src",
+        );
         video.load();
       }
     };
@@ -312,10 +544,15 @@ export default function LiveTVPlayer({
     playerUrl,
   ]);
 
-  /*
-   * No Live TV has been configured.
-   */
-  if (!settings || !isEnabled || !playerUrl) {
+  /* =======================================================
+     NO LIVE TV CONFIGURATION
+  ======================================================== */
+
+  if (
+    !settings ||
+    !isEnabled ||
+    !playerUrl
+  ) {
     return (
       <div
         className={`relative overflow-hidden bg-black ${
@@ -353,26 +590,57 @@ export default function LiveTVPlayer({
     );
   }
 
-  /*
-   * Hosted player:
-   * Castr / YouTube / Vimeo / custom Embed.
-   */
+  /* =======================================================
+     HOSTED EMBED PLAYER
+  ======================================================== */
+
   if (hostedPlayer) {
     return (
       <div
+        ref={embedContainerRef}
         className={`relative bg-black ${
           compact
             ? "aspect-video"
             : "aspect-video min-h-[300px]"
         }`}
       >
-        <iframe
-          src={playerUrl}
-          title={playerTitle}
-          className="absolute inset-0 h-full w-full border-0"
-          allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-          allowFullScreen
-        />
+        {shouldLoadEmbed ? (
+          <iframe
+            src={autoplayPlayerUrl}
+            title={playerTitle}
+            className="absolute inset-0 h-full w-full border-0"
+            allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+            allowFullScreen
+            loading={
+              compact
+                ? "eager"
+                : "eager"
+            }
+          />
+        ) : (
+          /*
+           * Before the Home iframe is loaded,
+           * keep the same player area.
+           */
+          <>
+            <img
+              src={poster}
+              alt="TV SUPREME Live"
+              className="absolute inset-0 h-full w-full object-cover opacity-80"
+            />
+
+            <div className="absolute inset-0 bg-black/20" />
+
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-black/60 text-white">
+                <Loader2
+                  size={22}
+                  className="animate-spin"
+                />
+              </div>
+            </div>
+          </>
+        )}
 
         <div className="pointer-events-none absolute left-3 top-3 z-10">
           <span
@@ -389,6 +657,7 @@ export default function LiveTVPlayer({
                   : "bg-slate-300"
               }`}
             />
+
             {isLive
               ? "LIVE"
               : "OFFLINE"}
@@ -398,9 +667,10 @@ export default function LiveTVPlayer({
     );
   }
 
-  /*
-   * Direct MP4 or direct HLS.
-   */
+  /* =======================================================
+     DIRECT MP4 / HLS PLAYER
+  ======================================================== */
+
   return (
     <div
       className={`relative bg-black ${
@@ -432,6 +702,7 @@ export default function LiveTVPlayer({
         }
         onError={() => {
           setIsLoading(false);
+
           setPlayerError(
             "The live video could not be played.",
           );

@@ -23,6 +23,7 @@ import HeroSlider from "@/components/home/HeroSlider";
 import { prisma } from "@/lib/prisma";
 import LiveTVPlayer from "@/components/home/LiveTVPlayer";
 import { getLiveTVSettings } from "@/lib/data/live-tv";
+
 /* =========================================================
    TYPES
 ========================================================= */
@@ -215,9 +216,9 @@ function formatDuration(
 async function getHomepageData(
   language: SupportedLanguage,
 ) {
-  
-  
-    const [
+
+
+  const [
     articleResult,
     categoryResult,
     videoRecords,
@@ -296,18 +297,18 @@ async function getHomepageData(
   const thumbnailRecords =
     thumbnailIds.length > 0
       ? await prisma.media.findMany({
-          where: {
-            id: {
-              in: thumbnailIds,
-            },
+        where: {
+          id: {
+            in: thumbnailIds,
           },
+        },
 
-          select: {
-            id: true,
-            url: true,
-            altText: true,
-          },
-        })
+        select: {
+          id: true,
+          url: true,
+          altText: true,
+        },
+      })
       : [];
 
   const thumbnailMap =
@@ -329,8 +330,8 @@ async function getHomepageData(
         image:
           (video.thumbnailId
             ? thumbnailMap.get(
-                video.thumbnailId,
-              )?.url
+              video.thumbnailId,
+            )?.url
             : undefined) ??
           "/images/home/live-tv.jpg",
 
@@ -559,15 +560,15 @@ export default async function HomePage() {
     getLanguageFromLocale(locale);
 
   const {
-  latestNews,
-  categories,
-  trendingTopics,
-  topStories,
-  heroStory,
-  heroStories,
-  videos,
-  liveTVSettings,
-} = await getHomepageData(language);
+    latestNews,
+    categories,
+    trendingTopics,
+    topStories,
+    heroStory,
+    heroStories,
+    videos,
+    liveTVSettings,
+  } = await getHomepageData(language);
 
   return (
     <main className="bg-white text-[#111d4a]">
@@ -606,7 +607,7 @@ export default async function HomePage() {
 
             <div className="divide-y divide-slate-100">
               {latestNews.length >
-              0 ? (
+                0 ? (
                 latestNews.map(
                   (news) => (
                     <Link
@@ -704,7 +705,7 @@ export default async function HomePage() {
             (category) => {
               const Icon =
                 categoryIcons[
-                  category.slug
+                category.slug
                 ] ?? Home;
 
               return (
@@ -738,56 +739,50 @@ export default async function HomePage() {
 
       <section className="tv-container py-6">
         <div className="grid gap-5 lg:grid-cols-[1.25fr_1fr_0.72fr]">
-       {/* =================================================
+          {/* =================================================
     LIVE TV
 ================================================== */}
 
-<section>
-  <div className="mb-4 flex items-center justify-between">
-    <h2 className="text-xl font-extrabold sm:text-2xl">
-      Live TV
-    </h2>
+          <section>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xl font-extrabold sm:text-2xl">
+                Live TV
+              </h2>
 
-    <Link
-      href="/watch-live"
-      className="inline-flex items-center gap-1 text-sm font-bold text-[#ec008c]"
-    >
-      Watch Live
-      <ArrowRight size={15} />
-    </Link>
-  </div>
+              <Link
+                href="/watch-live"
+                className="inline-flex items-center gap-1 text-sm font-bold text-[#ec008c]"
+              >
+                Watch Live
+                <ArrowRight size={15} />
+              </Link>
+            </div>
 
-  <div className="overflow-hidden rounded-xl bg-black shadow-sm">
-    <LiveTVPlayer
-      settings={liveTVSettings}
-      poster="/images/home/live-tv.jpg"
-      compact
-    />
+            <div className="overflow-hidden rounded-xl bg-black shadow-sm">
+              {/* ACTUAL LIVE PLAYER */}
+              <LiveTVPlayer
+                settings={liveTVSettings}
+                poster="/images/home/live-tv.jpg"
+              />
+              <div className="border-t border-white/10 bg-black px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-base font-extrabold text-white sm:text-lg">
+                      {liveTVSettings?.channelName ||
+                        "TV SUPREME LIVE"}
+                    </h3>
 
-    <div className="border-t border-white/10 bg-black px-4 py-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="truncate text-base font-extrabold text-white sm:text-lg">
-            {liveTVSettings?.channelName ||
-              "TV SUPREME LIVE"}
-          </h3>
+                    <p className="mt-1 text-xs text-white/70 sm:text-sm">
+                      {liveTVSettings?.playerTitle ||
+                        "Trusted News. Real Stories. Always With You."}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-          <p className="mt-1 text-xs text-white/70 sm:text-sm">
-            {liveTVSettings?.playerTitle ||
-              "Trusted News. Real Stories. Always With You."}
-          </p>
-        </div>
 
-        <Link
-          href="/watch-live"
-          className="shrink-0 text-xs font-bold text-[#ec008c] hover:text-white"
-        >
-          Watch Live →
-        </Link>
-      </div>
-    </div>
-  </div>
-</section>
+            </div>
+          </section>
 
           {/* =================================================
               FEATURED VIDEOS
@@ -812,7 +807,7 @@ export default async function HomePage() {
 
             <div className="space-y-3">
               {videos.length >
-              0 ? (
+                0 ? (
                 videos.map(
                   (video) => (
                     <Link
@@ -990,7 +985,7 @@ export default async function HomePage() {
         </div>
 
         {topStories.length >
-        0 ? (
+          0 ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {topStories.map(
               (story) => (
@@ -1005,10 +1000,10 @@ export default async function HomePage() {
                         story.mainImage
                           ?.url ??
                         categoryImages[
-                          story
-                            .category
-                            ?.slug ??
-                          ""
+                        story
+                          .category
+                          ?.slug ??
+                        ""
                         ] ??
                         "/images/home/hero.jpg"
                       }

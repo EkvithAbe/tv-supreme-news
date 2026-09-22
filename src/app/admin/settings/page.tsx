@@ -177,7 +177,13 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
-    void loadSettings();
+    const loadTimer = window.setTimeout(() => {
+      void loadSettings();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(loadTimer);
+    };
   }, []);
 
   const saveSettings = async () => {
@@ -1248,7 +1254,7 @@ export default function SettingsPage() {
               </p>
 
               <p className="text-xs text-slate-400">
-                Changes are loaded from and saved to PostgreSQL.
+                Changes are loaded from and saved to MySQL.
               </p>
             </div>
           </div>

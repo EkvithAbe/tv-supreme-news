@@ -1,0 +1,175 @@
+.background {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  opacity: 0.85;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      circle at 5% 35%,
+      rgba(255, 0, 140, 0.95),
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 60% 60%,
+      rgba(184, 0, 255, 0.45),
+      transparent 45%
+    ),
+    linear-gradient(
+      115deg,
+      #ff1689 0%,
+      #c20aa5 30%,
+      #7e14ba 58%,
+      #351295 100%
+    );
+  background-size: 140% 140%;
+  animation: gradientMove 12s ease-in-out infinite alternate;
+}
+
+.glow {
+  position: absolute;
+  width: 55vw;
+  height: 55vw;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.35;
+}
+
+.glowPink {
+  bottom: -30%;
+  left: -20%;
+  background: #ff008c;
+  animation: glowMove1 12s ease-in-out infinite alternate;
+}
+
+.glowPurple {
+  top: -20%;
+  right: -20%;
+  background: #7a00ff;
+  animation: glowMove2 15s ease-in-out infinite alternate;
+}
+
+.wave {
+  position: absolute;
+  width: 130vw;
+  height: 55vh;
+  border-top: 2px solid rgba(255, 140, 240, 0.55);
+  border-radius: 50%;
+  filter: drop-shadow(0 0 8px rgba(255, 30, 230, 0.65));
+}
+
+.wave1 {
+  bottom: -18%;
+  left: -15%;
+  transform: rotate(7deg);
+  animation: waveMove1 13s ease-in-out infinite alternate;
+}
+
+.wave2 {
+  bottom: -24%;
+  left: -25%;
+  width: 150vw;
+  height: 62vh;
+  opacity: 0.55;
+  transform: rotate(-2deg);
+  animation: waveMove2 16s ease-in-out infinite alternate;
+}
+
+.wave3 {
+  top: -28%;
+  left: -30%;
+  width: 70vw;
+  height: 50vh;
+  opacity: 0.45;
+  transform: rotate(-15deg);
+  animation: waveMove3 14s ease-in-out infinite alternate;
+}
+
+@keyframes gradientMove {
+  from {
+    background-position: 0% 50%;
+  }
+
+  to {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes glowMove1 {
+  from {
+    transform: translate(-5%, 5%) scale(1);
+  }
+
+  to {
+    transform: translate(15%, -10%) scale(1.15);
+  }
+}
+
+@keyframes glowMove2 {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+
+  to {
+    transform: translate(-15%, 12%) scale(1.2);
+  }
+}
+
+@keyframes waveMove1 {
+  from {
+    transform: translateX(-2%) translateY(0) rotate(7deg) scaleX(1);
+  }
+
+  to {
+    transform: translateX(5%) translateY(-7%) rotate(4deg) scaleX(1.08);
+  }
+}
+
+@keyframes waveMove2 {
+  from {
+    transform: translateX(2%) translateY(0) rotate(-2deg);
+  }
+
+  to {
+    transform: translateX(-5%) translateY(-5%) rotate(3deg);
+  }
+}
+
+@keyframes waveMove3 {
+  from {
+    transform: translateX(0) translateY(0) rotate(-15deg);
+  }
+
+  to {
+    transform: translateX(8%) translateY(8%) rotate(-10deg);
+  }
+}
+
+@media (max-width: 768px) {
+  .wave {
+    width: 180vw;
+  }
+
+  .wave1 {
+    bottom: -10%;
+  }
+
+  .wave2 {
+    bottom: -15%;
+  }
+
+  .glow {
+    width: 90vw;
+    height: 90vw;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .background,
+  .wave,
+  .glow {
+    animation: none;
+  }
+}

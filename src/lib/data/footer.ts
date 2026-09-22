@@ -67,7 +67,7 @@ export const footerSettingKeys = {
 /* =========================================================
    DEFAULT FOOTER LINKS
    These are bootstrap defaults only.
-   Once saved through Admin, PostgreSQL becomes the source
+   Once saved through Admin, MySQL becomes the source
    of truth.
 ========================================================= */
 

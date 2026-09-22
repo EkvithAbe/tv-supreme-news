@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireAdminApiAccess } from "@/lib/auth";
 import {
   getLiveTVSettings,
   saveLiveTVSettings,
@@ -47,6 +48,13 @@ function parseBoolean(
 ============================================================ */
 
 export async function GET() {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const settings = await getLiveTVSettings();
 
@@ -73,6 +81,13 @@ export async function GET() {
 ============================================================ */
 
 export async function POST(request: Request) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const body = await request.json();
 
@@ -172,6 +187,13 @@ export async function POST(request: Request) {
 ============================================================ */
 
 export async function PUT(request: Request) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const body = await request.json();
 
@@ -268,6 +290,13 @@ export async function PUT(request: Request) {
 ============================================================ */
 
 export async function PATCH(request: Request) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const body = await request.json();
 

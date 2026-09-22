@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
 import {
+  isAdmin,
+  requireContentApiAccess,
+} from "@/lib/auth";
+import {
   createVideo,
   deleteVideo,
   getVideoCategories,
@@ -11,6 +15,7 @@ import {
   type VideoLanguageValue,
   type VideoStatusValue,
 } from "@/lib/data/videos";
+import { recordActivity } from "@/lib/data/activity";
 
 export const runtime = "nodejs";
 
@@ -113,6 +118,13 @@ function parseDuration(
 export async function GET(
   request: Request,
 ) {
+  const access =
+    await requireContentApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const { searchParams } =
       new URL(request.url);
@@ -204,6 +216,13 @@ export async function GET(
 export async function POST(
   request: Request,
 ) {
+  const access =
+    await requireContentApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const body =
       await request.json();
@@ -333,12 +352,36 @@ export async function POST(
         duration,
 
         isFeatured:
+          isAdmin(access.user) &&
           body.isFeatured === true,
 
         publishedAt,
 
         scheduledAt,
       });
+
+    if (video) {
+      const action =
+        status === "SCHEDULED"
+          ? "VIDEO_SCHEDULED"
+          : status === "PUBLISHED"
+            ? "VIDEO_PUBLISHED"
+            : "VIDEO_CREATED";
+
+      await recordActivity({
+        actorId: access.user.id,
+        action,
+        resourceType: "VIDEO",
+        resourceId: video.id,
+        summary: `${action === "VIDEO_SCHEDULED" ? "Scheduled" : action === "VIDEO_PUBLISHED" ? "Published" : "Created"} video: ${video.title}`,
+        notifyAdmins: {
+          kind: "EDITOR_VIDEO_ACTIVITY",
+          title: "Video activity",
+          message: `${access.user.name}: ${video.title}`,
+          href: "/admin/videos",
+        },
+      });
+    }
 
     return NextResponse.json(
       {
@@ -380,6 +423,13 @@ export async function POST(
 export async function PUT(
   request: Request,
 ) {
+  const access =
+    await requireContentApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const body =
       await request.json();
@@ -568,6 +618,7 @@ export async function PUT(
     }
 
     if (
+      isAdmin(access.user) &&
       body.isFeatured !==
       undefined
     ) {
@@ -600,6 +651,27 @@ export async function PUT(
         id,
         updateData,
       );
+
+    if (video) {
+      await recordActivity({
+        actorId: access.user.id,
+        action:
+          updateData.status === "SCHEDULED"
+            ? "VIDEO_SCHEDULED"
+            : updateData.status === "PUBLISHED"
+              ? "VIDEO_PUBLISHED"
+              : "VIDEO_UPDATED",
+        resourceType: "VIDEO",
+        resourceId: video.id,
+        summary: `Updated video: ${video.title}`,
+        notifyAdmins: {
+          kind: "EDITOR_VIDEO_ACTIVITY",
+          title: "Video activity",
+          message: `${access.user.name}: ${video.title}`,
+          href: "/admin/videos",
+        },
+      });
+    }
 
     return NextResponse.json({
       success: true,
@@ -634,6 +706,13 @@ export async function PUT(
 export async function DELETE(
   request: Request,
 ) {
+  const access =
+    await requireContentApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const { searchParams } =
       new URL(request.url);
@@ -656,6 +735,20 @@ export async function DELETE(
 
     const result =
       await deleteVideo(id);
+
+    await recordActivity({
+      actorId: access.user.id,
+      action: "VIDEO_DELETED",
+      resourceType: "VIDEO",
+      resourceId: id,
+      summary: `Deleted video: ${result.video.title}`,
+      notifyAdmins: {
+        kind: "EDITOR_VIDEO_ACTIVITY",
+        title: "Video deleted",
+        message: `${access.user.name}: ${result.video.title}`,
+        href: "/admin/videos",
+      },
+    });
 
     return NextResponse.json({
       success: true,
@@ -700,6 +793,13 @@ export async function DELETE(
 export async function PATCH(
   request: Request,
 ) {
+  const access =
+    await requireContentApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const body =
       await request.json();
@@ -750,6 +850,22 @@ export async function PATCH(
         body.status,
         scheduledAt,
       );
+
+    if (video) {
+      await recordActivity({
+        actorId: access.user.id,
+        action: `VIDEO_STATUS_${body.status}`,
+        resourceType: "VIDEO",
+        resourceId: video.id,
+        summary: `Changed video status to ${body.status}: ${video.title}`,
+        notifyAdmins: {
+          kind: "EDITOR_VIDEO_ACTIVITY",
+          title: "Video status changed",
+          message: `${access.user.name}: ${video.title}`,
+          href: "/admin/videos",
+        },
+      });
+    }
 
     return NextResponse.json({
       success: true,

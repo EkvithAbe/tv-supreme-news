@@ -14,6 +14,7 @@ import {
   getArticles,
   type ArticleStatusValue,
 } from "@/lib/data/articles";
+import { requireCmsUserPage } from "@/lib/auth";
 
 type NewsStatus =
   | "drafts"
@@ -115,6 +116,8 @@ function formatDate(
 export default async function NewsStatusPage({
   params,
 }: PageProps) {
+  await requireCmsUserPage();
+
   const { status } = await params;
 
   if (
@@ -210,7 +213,7 @@ export default async function NewsStatusPage({
               <p className="text-sm text-slate-500">
                 Current{" "}
                 {config.label.toLowerCase()}{" "}
-                article records from PostgreSQL.
+                article records from MySQL.
               </p>
             </div>
           </div>
@@ -310,7 +313,7 @@ export default async function NewsStatusPage({
             <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-4">
               <p className="text-xs text-slate-400">
                 These articles are loaded directly
-                from PostgreSQL.
+                from MySQL.
               </p>
             </div>
           </>
@@ -327,7 +330,7 @@ export default async function NewsStatusPage({
 
             <p className="mt-2 max-w-md text-sm leading-6 text-slate-400">
               There are currently no articles with
-              this status in PostgreSQL.
+              this status in MySQL.
             </p>
           </div>
         )}
@@ -349,7 +352,7 @@ export default async function NewsStatusPage({
 
             <p className="mt-1 text-xs leading-5 text-slate-500">
               This page now uses the article status
-              stored in PostgreSQL. Creating or
+              stored in MySQL. Creating or
               changing an article status will update
               the corresponding status page.
             </p>

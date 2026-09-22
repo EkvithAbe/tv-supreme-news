@@ -71,7 +71,7 @@ function getDisplayTranslation(
 }
 
 /**
- * Get all categories from PostgreSQL.
+ * Get all categories from MySQL.
  *
  * Nothing is hardcoded here.
  */

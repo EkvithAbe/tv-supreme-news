@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ChangeEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -8,17 +9,31 @@ import {
 } from "react";
 import {
   Archive,
+  ArrowDown,
+  ArrowUp,
   Check,
   ChevronDown,
   Edit3,
   Eye,
   FileText,
   Globe2,
+  Image as ImageIcon,
   Plus,
   RefreshCw,
   Search,
+  Trash2,
+  Video,
   X,
 } from "lucide-react";
+import {
+  createPageBuilderBlock,
+  getPageBuilderBlocks,
+  getPageBuilderTextPreview,
+  serializePageBuilderBlocks,
+  type PageBlockPlacement,
+  type PageBlockType,
+  type PageBuilderBlock,
+} from "@/lib/page-builder";
 
 type PageStatus = "Published" | "Draft";
 type PageLanguage = "English" | "Sinhala" | "Tamil";
@@ -78,6 +93,21 @@ type ApiSingleResponse = {
   message?: string;
 };
 
+type PageMedia = {
+  id: string;
+  filename: string;
+  url: string;
+  type: "IMAGE" | "VIDEO" | "AUDIO" | "DOCUMENT";
+  altText: string | null;
+};
+
+type MediaResponse = {
+  success: boolean;
+  items?: PageMedia[];
+  media?: PageMedia;
+  message?: string;
+};
+
 const statusFilters = [
   { label: "All Pages", value: "All" },
   { label: "Published", value: "Published" },
@@ -122,6 +152,16 @@ const apiToStatus: Record<
 > = {
   DRAFT: "Draft",
   PUBLISHED: "Published",
+};
+
+const placementLabels: Record<
+  PageBlockPlacement,
+  string
+> = {
+  FULL: "Full width",
+  LEFT: "Left",
+  CENTER: "Centre",
+  RIGHT: "Right",
 };
 
 function formatDate(
@@ -232,8 +272,19 @@ export default function PagesPage() {
   const [status, setStatus] =
     useState<PageStatus>("Draft");
 
-  const [content, setContent] =
-    useState("");
+  const [blocks, setBlocks] = useState<
+    PageBuilderBlock[]
+  >([]);
+
+  const [mediaItems, setMediaItems] = useState<
+    PageMedia[]
+  >([]);
+
+  const [isLoadingMedia, setIsLoadingMedia] =
+    useState(false);
+
+  const [uploadingBlockId, setUploadingBlockId] =
+    useState<string | null>(null);
 
   /* =============================================================
      LOAD PAGES
@@ -310,7 +361,13 @@ export default function PagesPage() {
   );
 
   useEffect(() => {
-    void loadPages();
+    const loadTimer = window.setTimeout(() => {
+      void loadPages();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(loadTimer);
+    };
   }, [loadPages]);
 
   /* =============================================================
@@ -428,9 +485,41 @@ export default function PagesPage() {
     setDescription("");
     setLanguage("English");
     setStatus("Draft");
-    setContent("");
+    setBlocks([]);
     setEditingPage(null);
   };
+
+  const loadPageMedia = useCallback(
+    async () => {
+      try {
+        setIsLoadingMedia(true);
+
+        const response = await fetch(
+          "/api/admin/media?page=1&pageSize=100",
+          { cache: "no-store" },
+        );
+        const data: MediaResponse =
+          await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(
+            data.message || "Unable to load media.",
+          );
+        }
+
+        setMediaItems(data.items ?? []);
+      } catch (mediaError) {
+        setError(
+          mediaError instanceof Error
+            ? mediaError.message
+            : "Unable to load media.",
+        );
+      } finally {
+        setIsLoadingMedia(false);
+      }
+    },
+    [],
+  );
 
   const closeModal = () => {
     if (isSaving) {
@@ -446,6 +535,7 @@ export default function PagesPage() {
     setSuccessMessage("");
     resetForm();
     setShowModal(true);
+    void loadPageMedia();
   };
 
   const openEditModal = (
@@ -462,9 +552,111 @@ export default function PagesPage() {
     );
     setLanguage(page.language);
     setStatus(page.status);
-    setContent(page.content);
+    setBlocks(getPageBuilderBlocks(page.content));
 
     setShowModal(true);
+    void loadPageMedia();
+  };
+
+  const addBlock = (type: PageBlockType) => {
+    setBlocks((current) => [
+      ...current,
+      createPageBuilderBlock(type),
+    ]);
+  };
+
+  const updateBlock = (
+    blockId: string,
+    updates: Partial<PageBuilderBlock>,
+  ) => {
+    setBlocks((current) =>
+      current.map((block) =>
+        block.id === blockId
+          ? { ...block, ...updates }
+          : block,
+      ),
+    );
+  };
+
+  const removeBlock = (blockId: string) => {
+    setBlocks((current) =>
+      current.filter((block) => block.id !== blockId),
+    );
+  };
+
+  const moveBlock = (
+    blockIndex: number,
+    direction: -1 | 1,
+  ) => {
+    setBlocks((current) => {
+      const nextIndex = blockIndex + direction;
+
+      if (nextIndex < 0 || nextIndex >= current.length) {
+        return current;
+      }
+
+      const next = [...current];
+      const [block] = next.splice(blockIndex, 1);
+      next.splice(nextIndex, 0, block);
+      return next;
+    });
+  };
+
+  const uploadBlockMedia = async (
+    block: PageBuilderBlock,
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      setUploadingBlockId(block.id);
+      setError("");
+
+      const formData = new FormData();
+      formData.set("file", file);
+      formData.set("altText", "");
+
+      const response = await fetch("/api/admin/media", {
+        method: "POST",
+        body: formData,
+      });
+      const data: MediaResponse = await response.json();
+
+      if (!response.ok || !data.success || !data.media) {
+        throw new Error(
+          data.message || "Unable to upload media.",
+        );
+      }
+
+      if (data.media.type !== block.type) {
+        throw new Error(
+          `Please upload a ${block.type.toLowerCase()} file for this block.`,
+        );
+      }
+
+      setMediaItems((current) => [
+        data.media as PageMedia,
+        ...current.filter(
+          (item) => item.id !== data.media?.id,
+        ),
+      ]);
+      updateBlock(block.id, {
+        mediaId: data.media.id,
+      });
+    } catch (uploadError) {
+      setError(
+        uploadError instanceof Error
+          ? uploadError.message
+          : "Unable to upload media.",
+      );
+    } finally {
+      setUploadingBlockId(null);
+      event.target.value = "";
+    }
   };
 
   const handleTitleChange = (
@@ -490,7 +682,7 @@ export default function PagesPage() {
       generateSlug(cleanTitle);
 
     const cleanContent =
-      content.trim();
+      serializePageBuilderBlocks(blocks);
 
     const cleanDescription =
       description.trim();
@@ -505,6 +697,18 @@ export default function PagesPage() {
     if (!cleanSlug) {
       setError(
         "Page slug is required.",
+      );
+      return;
+    }
+
+    const incompleteMediaBlock = blocks.find(
+      (block) =>
+        block.type !== "TEXT" && !block.mediaId,
+    );
+
+    if (incompleteMediaBlock) {
+      setError(
+        `Select or upload media for the ${incompleteMediaBlock.type.toLowerCase()} block before saving.`,
       );
       return;
     }
@@ -1200,7 +1404,7 @@ export default function PagesPage() {
 
           <span>
             Page records are stored in
-            PostgreSQL.
+            MySQL.
           </span>
         </div>
       </section>
@@ -1249,7 +1453,9 @@ export default function PagesPage() {
                 </p>
 
                 <div className="mt-3 whitespace-pre-line text-sm leading-7 text-slate-600">
-                  {selectedPage.content ||
+                  {getPageBuilderTextPreview(
+                    selectedPage.content,
+                  ) ||
                     "No content added yet."}
                 </div>
               </div>
@@ -1564,34 +1770,215 @@ export default function PagesPage() {
                 </p>
               </div>
 
-              {/* Content */}
+              {/* Content builder */}
 
-              <div>
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <label
-                    htmlFor="pageContent"
-                    className="block text-sm font-semibold text-slate-700"
-                  >
-                    Page Content
-                  </label>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-800">
+                      Page content
+                    </h3>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                      Add blocks in the order they should appear. Every image or video can be full width, left, centre, or right.
+                    </p>
+                  </div>
 
-                  <span className="text-xs text-slate-400">
-                    Basic editor
-                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => addBlock("TEXT")}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                    >
+                      <FileText size={14} />
+                      Text
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addBlock("IMAGE")}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                    >
+                      <ImageIcon size={14} />
+                      Image
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addBlock("VIDEO")}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                    >
+                      <Video size={14} />
+                      Video
+                    </button>
+                  </div>
                 </div>
 
-                <textarea
-                  id="pageContent"
-                  rows={10}
-                  value={content}
-                  onChange={(event) =>
-                    setContent(
-                      event.target.value,
-                    )
-                  }
-                  placeholder="Write the page content here..."
-                  className="w-full resize-y rounded-xl border border-slate-200 px-4 py-3 text-sm leading-7 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-pink-400 focus:ring-4 focus:ring-pink-50"
-                />
+                {blocks.length === 0 ? (
+                  <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
+                    Start by adding a text, image, or video block.
+                  </div>
+                ) : (
+                  <div className="mt-5 space-y-4">
+                    {blocks.map((block, index) => {
+                      const isMediaBlock = block.type !== "TEXT";
+                      const compatibleMedia =
+                        block.type === "TEXT"
+                          ? []
+                          : mediaItems.filter(
+                              (item) => item.type === block.type,
+                            );
+
+                      return (
+                        <div
+                          key={block.id}
+                          className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                            <p className="inline-flex items-center gap-2 text-sm font-semibold text-slate-800">
+                              {block.type === "TEXT" ? (
+                                <FileText size={15} className="text-pink-600" />
+                              ) : block.type === "IMAGE" ? (
+                                <ImageIcon size={15} className="text-pink-600" />
+                              ) : (
+                                <Video size={15} className="text-pink-600" />
+                              )}
+                              {block.type.charAt(0) + block.type.slice(1).toLowerCase()} block {index + 1}
+                            </p>
+
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => moveBlock(index, -1)}
+                                disabled={index === 0}
+                                className="rounded-md p-1.5 text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"
+                                aria-label="Move block up"
+                              >
+                                <ArrowUp size={15} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveBlock(index, 1)}
+                                disabled={index === blocks.length - 1}
+                                className="rounded-md p-1.5 text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"
+                                aria-label="Move block down"
+                              >
+                                <ArrowDown size={15} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeBlock(block.id)}
+                                className="rounded-md p-1.5 text-red-500 transition hover:bg-red-50"
+                                aria-label="Remove block"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
+                            <div>
+                              {isMediaBlock ? (
+                                <>
+                                  <label className="mb-2 block text-xs font-semibold text-slate-600">
+                                    Select existing {block.type.toLowerCase()}
+                                  </label>
+                                  <select
+                                    value={block.mediaId ?? ""}
+                                    onChange={(event) =>
+                                      updateBlock(block.id, {
+                                        mediaId: event.target.value || undefined,
+                                      })
+                                    }
+                                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-pink-400"
+                                  >
+                                    <option value="">
+                                      {isLoadingMedia ? "Loading media..." : `Choose a ${block.type.toLowerCase()}...`}
+                                    </option>
+                                    {compatibleMedia.map((item) => (
+                                      <option key={item.id} value={item.id}>
+                                        {item.filename}
+                                      </option>
+                                    ))}
+                                  </select>
+
+                                  <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-pink-200 bg-pink-50 px-3 py-2 text-xs font-semibold text-pink-700 transition hover:bg-pink-100">
+                                    {uploadingBlockId === block.id
+                                      ? "Uploading..."
+                                      : `Upload new ${block.type.toLowerCase()}`}
+                                    <input
+                                      type="file"
+                                      accept={block.type === "IMAGE" ? "image/*" : "video/*"}
+                                      disabled={uploadingBlockId !== null}
+                                      onChange={(event) =>
+                                        void uploadBlockMedia(block, event)
+                                      }
+                                      className="sr-only"
+                                    />
+                                  </label>
+                                </>
+                              ) : (
+                                <>
+                                  <label className="mb-2 block text-xs font-semibold text-slate-600">
+                                    Text
+                                  </label>
+                                  <textarea
+                                    rows={6}
+                                    value={block.text ?? ""}
+                                    onChange={(event) =>
+                                      updateBlock(block.id, {
+                                        text: event.target.value,
+                                      })
+                                    }
+                                    placeholder="Write this section of the page..."
+                                    className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2.5 text-sm leading-6 text-slate-800 outline-none focus:border-pink-400"
+                                  />
+                                </>
+                              )}
+                            </div>
+
+                            <div>
+                              <label className="mb-2 block text-xs font-semibold text-slate-600">
+                                Display position
+                              </label>
+                              <select
+                                value={block.placement}
+                                onChange={(event) =>
+                                  updateBlock(block.id, {
+                                    placement: event.target.value as PageBlockPlacement,
+                                  })
+                                }
+                                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-pink-400"
+                              >
+                                {(Object.keys(placementLabels) as PageBlockPlacement[]).map((item) => (
+                                  <option key={item} value={item}>
+                                    {placementLabels[item]}
+                                  </option>
+                                ))}
+                              </select>
+
+                              {isMediaBlock && (
+                                <>
+                                  <label className="mb-2 mt-4 block text-xs font-semibold text-slate-600">
+                                    Caption (optional)
+                                  </label>
+                                  <textarea
+                                    rows={3}
+                                    value={block.caption ?? ""}
+                                    onChange={(event) =>
+                                      updateBlock(block.id, {
+                                        caption: event.target.value,
+                                      })
+                                    }
+                                    placeholder="Describe this media..."
+                                    className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2.5 text-sm leading-6 text-slate-800 outline-none focus:border-pink-400"
+                                  />
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Info */}

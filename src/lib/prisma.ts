@@ -1,27 +1,25 @@
 import "server-only";
-
-import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../../generated/prisma/client";
+import { PrismaMariaDb } from "@prisma/adapter-mariadb";
+import { getDatabaseConnection } from "./mysql-config";
 
-const connectionString = process.env.DATABASE_URL;
+const createPrismaClient = () => {
+  const connection = getDatabaseConnection();
 
-if (!connectionString) {
-  throw new Error("DATABASE_URL is not defined.");
-}
-
-const adapter = new PrismaPg({
-  connectionString,
-});
+  return new PrismaClient({
+    adapter: new PrismaMariaDb(
+      connection.kind === "mysql-config" ? connection.config : connection.url,
+    ),
+  });
+};
 
 const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
+  prisma: ReturnType<typeof createPrismaClient> | undefined;
 };
 
 export const prisma =
   globalForPrisma.prisma ??
-  new PrismaClient({
-    adapter,
-  });
+  createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;

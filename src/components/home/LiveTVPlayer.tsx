@@ -227,10 +227,8 @@ export default function LiveTVPlayer({
    * Watch Live page keeps the original
    * immediate loading behavior.
    */
-  const [
-    shouldLoadEmbed,
-    setShouldLoadEmbed,
-  ] = useState(!compact);
+  const [hasIntersected, setHasIntersected] =
+    useState(false);
 
   const [isLoading, setIsLoading] =
     useState(false);
@@ -263,6 +261,11 @@ export default function LiveTVPlayer({
     (isHostedPlayerUrl(playerUrl) ||
       streamType === "EMBED");
 
+  const shouldLoadEmbed =
+    !hostedPlayer ||
+    !compact ||
+    hasIntersected;
+
   const directHls =
     Boolean(playerUrl) &&
     streamType === "HLS" &&
@@ -290,11 +293,7 @@ export default function LiveTVPlayer({
      * - this is not a hosted player
      * - this is not the compact Home player
      */
-    if (
-      !hostedPlayer ||
-      !compact
-    ) {
-      setShouldLoadEmbed(true);
+    if (!hostedPlayer || !compact) {
       return;
     }
 
@@ -318,7 +317,7 @@ export default function LiveTVPlayer({
           if (
             entry?.isIntersecting
           ) {
-            setShouldLoadEmbed(true);
+            setHasIntersected(true);
 
             observer.disconnect();
           }

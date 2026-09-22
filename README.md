@@ -1,4 +1,31 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+TV SUPREME is a [Next.js](https://nextjs.org) news platform backed by a local MySQL database through Prisma.
+
+## Local MySQL setup
+
+The app reads its database connection from the root `.env` file. The included local configuration targets the existing `supremenews` database on `127.0.0.1:3306`.
+
+For another local MySQL user, password, host, or database, copy `.env.example` to `.env` and update these separate values:
+
+```env
+MYSQL_HOST="127.0.0.1"
+MYSQL_PORT="3306"
+MYSQL_DATABASE="supremenews"
+MYSQL_USER="YOUR_MYSQL_USER"
+MYSQL_PASSWORD="YOUR_MYSQL_PASSWORD"
+```
+
+The app uses those values directly at runtime. Prisma creates its required connection string only in memory; a database URL is not stored in `.env`.
+
+Use an `utf8mb4` case-insensitive collation so English, Sinhala, and Tamil content and search behavior work as expected.
+
+```bash
+npm install
+npm run db:generate
+npm run db:validate
+npm run dev
+```
+
+`npm run db:push` is available only when you intentionally want Prisma to synchronize schema changes to MySQL. It is not needed to use the existing local database.
 
 ## Getting Started
 

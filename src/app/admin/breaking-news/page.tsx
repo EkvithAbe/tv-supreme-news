@@ -1015,7 +1015,7 @@ export default function BreakingNewsPage() {
             <p className="text-xs leading-5 text-slate-400">
               Breaking news settings are currently UI-only. They
               will later be connected to the Article and
-              notification system through PostgreSQL.
+              notification system through MySQL.
             </p>
           </div>
         </section>

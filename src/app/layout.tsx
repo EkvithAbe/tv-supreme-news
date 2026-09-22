@@ -1,34 +1,32 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
-import { NextIntlClientProvider } from "next-intl";
-import { getLocale, getMessages } from "next-intl/server";
-
 import { ThemeProvider } from "@/components/common/ThemeProvider";
 import SiteShell from "@/components/common/SiteShell";
+import { NextIntlClientProvider } from "next-intl";
+import englishMessages from "@/messages/en.json";
 
 export const metadata: Metadata = {
   title: "TV SUPREME",
   description: "News. People. A Brighter Tomorrow.",
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const locale = await getLocale();
-  const messages = await getMessages();
-
   return (
-    <html lang={locale} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body>
         <ThemeProvider>
           <NextIntlClientProvider
-            locale={locale}
-            messages={messages}
+            locale="en"
+            messages={englishMessages}
           >
-            <SiteShell>{children}</SiteShell>
+            <SiteShell skipLocalizedPublicRoutes>
+              {children}
+            </SiteShell>
           </NextIntlClientProvider>
         </ThemeProvider>
       </body>

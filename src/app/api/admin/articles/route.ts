@@ -1,19 +1,31 @@
 import { NextResponse } from "next/server";
 
 import {
+  isAdmin,
+  requireContentApiAccess,
+} from "@/lib/auth";
+import {
   createArticle,
   deleteArticle,
   getArticles,
   updateArticle,
   updateArticleStatus,
 } from "@/lib/data/articles";
+import { recordActivity } from "@/lib/data/activity";
 
 /**
  * GET /api/admin/articles
  *
- * Returns articles from PostgreSQL.
+ * Returns articles from MySQL.
  */
 export async function GET(request: Request) {
+  const access =
+    await requireContentApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const { searchParams } = new URL(request.url);
 
@@ -94,19 +106,31 @@ export async function GET(request: Request) {
 /**
  * POST /api/admin/articles
  *
- * Creates a new article in PostgreSQL.
+ * Creates a new article in MySQL.
  */
 export async function POST(
   request: Request,
 ) {
+  const access =
+    await requireContentApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const body =
       await request.json();
 
+    const canManageHomepage = isAdmin(
+      access.user,
+    );
+
     if (
       !body.slug ||
       !body.categoryId ||
-      !body.authorId
+      (canManageHomepage &&
+        !body.authorId)
     ) {
       return NextResponse.json(
         {
@@ -125,7 +149,9 @@ export async function POST(
           body.categoryId,
 
         authorId:
-          body.authorId,
+          canManageHomepage
+            ? body.authorId
+            : access.user.id,
 
         mainImageId:
           body.mainImageId ??
@@ -135,16 +161,19 @@ export async function POST(
           body.status ?? "DRAFT",
 
         isBreaking:
-          body.isBreaking ??
-          false,
+          canManageHomepage
+            ? (body.isBreaking ?? false)
+            : false,
 
         isFeatured:
-          body.isFeatured ??
-          false,
+          canManageHomepage
+            ? (body.isFeatured ?? false)
+            : false,
 
         showOnHomepage:
-          body.showOnHomepage ??
-          false,
+          canManageHomepage
+            ? (body.showOnHomepage ?? false)
+            : false,
 
         showInLatest:
           body.showInLatest ??
@@ -172,6 +201,29 @@ export async function POST(
             ? body.mediaIds
             : [],
       });
+
+    if (article) {
+      const action =
+        body.status === "SCHEDULED"
+          ? "ARTICLE_SCHEDULED"
+          : body.status === "PUBLISHED"
+            ? "ARTICLE_PUBLISHED"
+            : "ARTICLE_CREATED";
+
+      await recordActivity({
+        actorId: access.user.id,
+        action,
+        resourceType: "ARTICLE",
+        resourceId: article.id,
+        summary: `${action === "ARTICLE_SCHEDULED" ? "Scheduled" : action === "ARTICLE_PUBLISHED" ? "Published" : "Created"} article: ${article.title}`,
+        notifyAdmins: {
+          kind: "EDITOR_ARTICLE_ACTIVITY",
+          title: "Article activity",
+          message: `${access.user.name}: ${article.title}`,
+          href: `/admin/news/edit/${article.id}`,
+        },
+      });
+    }
 
     return NextResponse.json(
       {
@@ -201,7 +253,7 @@ export async function POST(
 /**
  * PUT /api/admin/articles
  *
- * Updates an existing article in PostgreSQL.
+ * Updates an existing article in MySQL.
  *
  * Body example:
  * {
@@ -216,9 +268,20 @@ export async function POST(
 export async function PUT(
   request: Request,
 ) {
+  const access =
+    await requireContentApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const body =
       await request.json();
+
+    const canManageHomepage = isAdmin(
+      access.user,
+    );
 
     if (!body.id) {
       return NextResponse.json(
@@ -247,7 +310,8 @@ export async function PUT(
               }
             : {}),
 
-          ...(body.authorId !== undefined
+          ...(canManageHomepage &&
+          body.authorId !== undefined
             ? {
                 authorId:
                   body.authorId,
@@ -268,21 +332,24 @@ export async function PUT(
               }
             : {}),
 
-          ...(body.isBreaking !== undefined
+          ...(canManageHomepage &&
+          body.isBreaking !== undefined
             ? {
                 isBreaking:
                   body.isBreaking,
               }
             : {}),
 
-          ...(body.isFeatured !== undefined
+          ...(canManageHomepage &&
+          body.isFeatured !== undefined
             ? {
                 isFeatured:
                   body.isFeatured,
               }
             : {}),
 
-          ...(body.showOnHomepage !== undefined
+          ...(canManageHomepage &&
+          body.showOnHomepage !== undefined
             ? {
                 showOnHomepage:
                   body.showOnHomepage,
@@ -343,6 +410,29 @@ export async function PUT(
         },
       );
 
+    if (article) {
+      const action =
+        body.status === "SCHEDULED"
+          ? "ARTICLE_SCHEDULED"
+          : body.status === "PUBLISHED"
+            ? "ARTICLE_PUBLISHED"
+            : "ARTICLE_UPDATED";
+
+      await recordActivity({
+        actorId: access.user.id,
+        action,
+        resourceType: "ARTICLE",
+        resourceId: article.id,
+        summary: `${action === "ARTICLE_SCHEDULED" ? "Scheduled" : action === "ARTICLE_PUBLISHED" ? "Published" : "Updated"} article: ${article.title}`,
+        notifyAdmins: {
+          kind: "EDITOR_ARTICLE_ACTIVITY",
+          title: "Article activity",
+          message: `${access.user.name}: ${article.title}`,
+          href: `/admin/news/edit/${article.id}`,
+        },
+      });
+    }
+
     return NextResponse.json({
       success: true,
       article,
@@ -368,7 +458,7 @@ export async function PUT(
 /**
  * DELETE /api/admin/articles
  *
- * Deletes an article from PostgreSQL.
+ * Deletes an article from MySQL.
  *
  * Body:
  * {
@@ -378,6 +468,13 @@ export async function PUT(
 export async function DELETE(
   request: Request,
 ) {
+  const access =
+    await requireContentApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const body =
       await request.json();
@@ -395,6 +492,20 @@ export async function DELETE(
     await deleteArticle(
       body.id,
     );
+
+    await recordActivity({
+      actorId: access.user.id,
+      action: "ARTICLE_DELETED",
+      resourceType: "ARTICLE",
+      resourceId: body.id,
+      summary: "Deleted an article.",
+      notifyAdmins: {
+        kind: "EDITOR_ARTICLE_ACTIVITY",
+        title: "Article deleted",
+        message: `${access.user.name} deleted an article.`,
+        href: "/admin/news",
+      },
+    });
 
     return NextResponse.json({
       success: true,
@@ -433,6 +544,13 @@ export async function DELETE(
 export async function PATCH(
   request: Request,
 ) {
+  const access =
+    await requireContentApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const body =
       await request.json();
@@ -475,6 +593,22 @@ export async function PATCH(
         body.id,
         body.status,
       );
+
+    if (article) {
+      await recordActivity({
+        actorId: access.user.id,
+        action: `ARTICLE_STATUS_${body.status}`,
+        resourceType: "ARTICLE",
+        resourceId: article.id,
+        summary: `Changed article status to ${body.status}: ${article.title}`,
+        notifyAdmins: {
+          kind: "EDITOR_ARTICLE_ACTIVITY",
+          title: "Article status changed",
+          message: `${access.user.name}: ${article.title}`,
+          href: `/admin/news/edit/${article.id}`,
+        },
+      });
+    }
 
     return NextResponse.json({
       success: true,

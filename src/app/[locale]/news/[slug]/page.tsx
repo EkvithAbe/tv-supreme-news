@@ -166,7 +166,7 @@ export default async function NewsArticlePage({
   const language = getLanguage(locale);
 
   /*
-   * Load the article directly from PostgreSQL.
+   * Load the article directly from MySQL.
    */
   const article =
     await getArticleBySlug(
@@ -185,7 +185,7 @@ export default async function NewsArticlePage({
   }
 
   /*
-   * Load published articles from PostgreSQL
+   * Load published articles from MySQL
    * for the sidebar and related stories.
    */
   const publishedResult =
@@ -261,7 +261,7 @@ export default async function NewsArticlePage({
    * Main image.
    *
    * This fallback is only a UI asset fallback.
-   * The article itself still comes from PostgreSQL.
+   * The article itself still comes from MySQL.
    */
   const imageUrl =
     article.mainImage?.url ??

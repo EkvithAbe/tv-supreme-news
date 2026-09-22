@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireAdminApiAccess } from "@/lib/auth";
 import {
   createMenuItem,
   deleteMenuItem,
@@ -73,6 +74,13 @@ function parseBoolean(
 export async function GET(
   request: Request,
 ) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const { searchParams } =
       new URL(request.url);
@@ -186,6 +194,13 @@ export async function GET(
 export async function POST(
   request: Request,
 ) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const body =
       await request.json();
@@ -355,6 +370,13 @@ export async function POST(
 export async function PUT(
   request: Request,
 ) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const body =
       await request.json();
@@ -585,6 +607,13 @@ export async function PUT(
 export async function DELETE(
   request: Request,
 ) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const { searchParams } =
       new URL(request.url);
@@ -654,6 +683,13 @@ export async function DELETE(
 export async function PATCH(
   request: Request,
 ) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const body =
       await request.json();

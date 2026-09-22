@@ -1,9 +1,9 @@
 import "server-only";
 
 import {
-  createHash,
   randomBytes,
   scryptSync,
+  timingSafeEqual,
 } from "node:crypto";
 
 import { prisma } from "@/lib/prisma";
@@ -13,23 +13,27 @@ import {
 
 export type CmsUserRole =
   | "ADMIN"
-  | "EDITOR"
-  | "JOURNALIST"
-  | "VIDEO_EDITOR"
-  | "PHOTOGRAPHER";
+  | "EDITOR";
 
 export interface CreateUserInput {
   name: string;
   email: string;
   password: string;
   role?: CmsUserRole;
+  phone?: string | null;
+  jobTitle?: string | null;
+  bio?: string | null;
+  profileImageId?: string | null;
 }
 
 export interface UpdateUserInput {
   name?: string;
   email?: string;
   password?: string;
-  role?: CmsUserRole;
+  phone?: string | null;
+  jobTitle?: string | null;
+  bio?: string | null;
+  profileImageId?: string | null;
 }
 
 function getRoleEnum(
@@ -56,7 +60,7 @@ function normalizeName(
  * Format:
  * scrypt:salt:hash
  */
-function hashPassword(
+export function hashPassword(
   password: string,
 ): string {
   const salt =
@@ -106,18 +110,34 @@ export function verifyPassword(
   const salt = parts[1];
   const expectedHash = parts[2];
 
-  const actualHash =
-    hashPasswordWithSalt(
-      password,
-      salt,
+  try {
+    const actualHash = Buffer.from(
+      hashPasswordWithSalt(
+        password,
+        salt,
+      ),
+      "hex",
     );
 
-  return createHash("sha256")
-    .update(actualHash)
-    .digest("hex") ===
-    createHash("sha256")
-      .update(expectedHash)
-      .digest("hex");
+    const expected = Buffer.from(
+      expectedHash,
+      "hex",
+    );
+
+    if (
+      actualHash.length === 0 ||
+      actualHash.length !== expected.length
+    ) {
+      return false;
+    }
+
+    return timingSafeEqual(
+      actualHash,
+      expected,
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -130,6 +150,16 @@ function publicUser(user: {
   name: string;
   email: string;
   role: UserRole;
+  phone?: string | null;
+  jobTitle?: string | null;
+  bio?: string | null;
+  profileImageId?: string | null;
+  profileImage?: {
+    id: string;
+    filename: string;
+    url: string;
+    altText: string | null;
+  } | null;
   createdAt: Date;
   updatedAt: Date;
   _count?: {
@@ -141,6 +171,11 @@ function publicUser(user: {
     name: user.name,
     email: user.email,
     role: user.role,
+    phone: user.phone ?? null,
+    jobTitle: user.jobTitle ?? null,
+    bio: user.bio ?? null,
+    profileImageId: user.profileImageId ?? null,
+    profileImage: user.profileImage ?? null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
     articleCount:
@@ -163,6 +198,14 @@ export async function getUsers() {
             articles: true,
           },
         },
+        profileImage: {
+          select: {
+            id: true,
+            filename: true,
+            url: true,
+            altText: true,
+          },
+        },
       },
     });
 
@@ -181,7 +224,6 @@ export async function getArticleAuthors() {
           in: [
             UserRole.ADMIN,
             UserRole.EDITOR,
-            UserRole.JOURNALIST,
           ],
         },
       },
@@ -216,6 +258,14 @@ export async function getUserById(
             articles: true,
           },
         },
+        profileImage: {
+          select: {
+            id: true,
+            filename: true,
+            url: true,
+            altText: true,
+          },
+        },
       },
     });
 
@@ -242,7 +292,7 @@ export async function createUser(
     input.password;
 
   const role =
-    input.role ?? "JOURNALIST";
+    input.role ?? "EDITOR";
 
   if (!name) {
     throw new Error(
@@ -297,11 +347,31 @@ export async function createUser(
         passwordHash,
         role:
           getRoleEnum(role),
+        phone:
+          input.phone?.trim() ||
+          null,
+        jobTitle:
+          input.jobTitle?.trim() ||
+          null,
+        bio:
+          input.bio?.trim() ||
+          null,
+        profileImageId:
+          input.profileImageId ||
+          null,
       },
       include: {
         _count: {
           select: {
             articles: true,
+          },
+        },
+        profileImage: {
+          select: {
+            id: true,
+            filename: true,
+            url: true,
+            altText: true,
           },
         },
       },
@@ -339,6 +409,10 @@ export async function updateUser(
     email?: string;
     passwordHash?: string;
     role?: UserRole;
+    phone?: string | null;
+    jobTitle?: string | null;
+    bio?: string | null;
+    profileImageId?: string | null;
   } = {};
 
   if (
@@ -408,27 +482,63 @@ export async function updateUser(
       );
   }
 
-  if (
-    input.role !== undefined
-  ) {
-    data.role =
-      getRoleEnum(input.role);
+  if (input.phone !== undefined) {
+    data.phone = input.phone?.trim() || null;
   }
 
-  const user =
-    await prisma.user.update({
-      where: {
-        id,
-      },
-      data,
-      include: {
-        _count: {
-          select: {
-            articles: true,
+  if (input.jobTitle !== undefined) {
+    data.jobTitle =
+      input.jobTitle?.trim() || null;
+  }
+
+  if (input.bio !== undefined) {
+    data.bio = input.bio?.trim() || null;
+  }
+
+  if (input.profileImageId !== undefined) {
+    data.profileImageId =
+      input.profileImageId || null;
+  }
+
+  const passwordWasChanged =
+    data.passwordHash !== undefined;
+
+  const user = await prisma.$transaction(
+    async (transaction) => {
+      const updated =
+        await transaction.user.update({
+          where: {
+            id,
           },
-        },
-      },
-    });
+          data,
+          include: {
+            _count: {
+              select: {
+                articles: true,
+              },
+            },
+            profileImage: {
+              select: {
+                id: true,
+                filename: true,
+                url: true,
+                altText: true,
+              },
+            },
+          },
+        });
+
+      if (passwordWasChanged) {
+        await transaction.session.deleteMany({
+          where: {
+            userId: id,
+          },
+        });
+      }
+
+      return updated;
+    },
+  );
 
   return publicUser(user);
 }
@@ -454,12 +564,26 @@ export async function deleteUser(
             articles: true,
           },
         },
+        profileImage: {
+          select: {
+            id: true,
+            filename: true,
+            url: true,
+            altText: true,
+          },
+        },
       },
     });
 
   if (!user) {
     throw new Error(
       "User not found.",
+    );
+  }
+
+  if (user.role === UserRole.ADMIN) {
+    throw new Error(
+      "The administrator account cannot be deleted.",
     );
   }
 

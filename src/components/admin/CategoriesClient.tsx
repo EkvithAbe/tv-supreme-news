@@ -463,7 +463,7 @@ export default function CategoriesClient({
           value={String(
             categories.length,
           )}
-          note="Stored in PostgreSQL"
+          note="Stored in MySQL"
           icon={
             <FolderTree size={20} />
           }

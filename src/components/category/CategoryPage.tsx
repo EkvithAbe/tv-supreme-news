@@ -260,7 +260,7 @@ export default function CategoryPage({
     categoryInfo.latest;
 
   /*
-   * Convert PostgreSQL articles into the
+   * Convert MySQL articles into the
    * display format used by this page.
    */
   const news = useMemo(() => {

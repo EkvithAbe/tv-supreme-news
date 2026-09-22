@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireAdminApiAccess } from "@/lib/auth";
 import {
   createPage,
   deletePage,
@@ -42,6 +43,32 @@ function isValidStatus(
   );
 }
 
+function getPageMutationErrorMessage(
+  error: unknown,
+  fallback: string,
+) {
+  const message =
+    error instanceof Error ? error.message : "";
+
+  if (
+    message.includes("Page_slug_key") ||
+    message.includes("Unique constraint failed") ||
+    message.includes("already uses this URL slug")
+  ) {
+    return "A page already uses this URL slug. Choose a different slug or edit the existing page.";
+  }
+
+  const safeMessages = new Set([
+    "Page not found.",
+    "Page slug is required.",
+    "Page title is required.",
+    "Invalid page language.",
+    "Invalid page status.",
+  ]);
+
+  return safeMessages.has(message) ? message : fallback;
+}
+
 /* ============================================================
    GET
    GET /api/admin/pages
@@ -50,6 +77,13 @@ function isValidStatus(
 export async function GET(
   request: Request,
 ) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const { searchParams } =
       new URL(request.url);
@@ -104,6 +138,13 @@ export async function GET(
 export async function POST(
   request: Request,
 ) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const body = await request.json();
 
@@ -261,17 +302,21 @@ export async function POST(
       error,
     );
 
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Failed to create page.";
+    const message = getPageMutationErrorMessage(
+      error,
+      "Failed to create page.",
+    );
+
+    const statusCode = message.includes("already uses")
+      ? 409
+      : 500;
 
     return NextResponse.json(
       {
         success: false,
         message,
       },
-      { status: 500 },
+      { status: statusCode },
     );
   }
 }
@@ -284,6 +329,13 @@ export async function POST(
 export async function PUT(
   request: Request,
 ) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const body = await request.json();
 
@@ -428,17 +480,19 @@ export async function PUT(
       error,
     );
 
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Failed to update page.";
+    const message = getPageMutationErrorMessage(
+      error,
+      "Failed to update page.",
+    );
 
     const statusCode =
-      message
-        .toLowerCase()
-        .includes("not found")
-        ? 404
-        : 500;
+      message.includes("already uses")
+        ? 409
+        : message
+              .toLowerCase()
+              .includes("not found")
+          ? 404
+          : 500;
 
     return NextResponse.json(
       {
@@ -458,6 +512,13 @@ export async function PUT(
 export async function DELETE(
   request: Request,
 ) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const { searchParams } =
       new URL(request.url);
@@ -520,6 +581,13 @@ export async function DELETE(
 export async function PATCH(
   request: Request,
 ) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const body = await request.json();
 

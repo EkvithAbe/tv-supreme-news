@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 
 import {
-  getMenuItems,
+  getPublicMenuItems,
   supportedMenuLanguages,
   type MenuLanguage,
 } from "@/lib/data/menu";
@@ -43,7 +43,7 @@ export async function GET(
       menuItems,
       siteConfig,
     ] = await Promise.all([
-      getMenuItems(language),
+      getPublicMenuItems(language),
       getSiteConfig(),
     ]);
 

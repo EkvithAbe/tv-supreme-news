@@ -111,7 +111,7 @@ const categoryIcons: Record<
 /* =========================================================
    CATEGORY IMAGES
    UI fallback images only.
-   Actual category/content data comes from PostgreSQL.
+   Actual category/content data comes from MySQL.
 ========================================================= */
 
 const categoryImages: Record<

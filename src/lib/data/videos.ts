@@ -358,14 +358,12 @@ export async function getVideos(
               title: {
                 contains:
                   search.trim(),
-                mode: "insensitive" as const,
               },
             },
             {
               description: {
                 contains:
                   search.trim(),
-                mode: "insensitive" as const,
               },
             },
           ],

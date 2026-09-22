@@ -31,6 +31,7 @@ import {
 import { useTheme } from "@/components/common/ThemeProvider";
 import { Link } from "@/i18n/navigation";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 /* =========================================================
    TYPES
@@ -57,6 +58,7 @@ type HeaderMenuItem = {
   desktop: boolean;
   mobile: boolean;
   openNewTab: boolean;
+  usesEnglishFallback?: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -94,6 +96,49 @@ const fallbackSiteConfig: HeaderSiteConfig = {
     instagram: "",
     tiktok: "",
   },
+};
+
+const fallbackMenuItems: HeaderMenuItem[] = [
+  ["home", "Home", "/"],
+  ["latest", "Latest", "/latest"],
+  ["sri-lanka", "Sri Lanka", "/sri-lanka"],
+  ["world", "World", "/world"],
+  ["politics", "Politics", "/politics"],
+  ["business", "Business", "/business"],
+  ["sports", "Sports", "/sports"],
+  ["entertainment", "Entertainment", "/entertainment"],
+  ["technology", "Technology", "/technology"],
+  ["lifestyle", "Lifestyle", "/lifestyle"],
+  ["video", "Video", "/video"],
+  ["watch-live", "Watch Live", "/watch-live"],
+].map(([id, label, href], position) => ({
+  id,
+  language: "EN",
+  label,
+  href,
+  position,
+  isVisible: true,
+  type: "Custom Link",
+  desktop: true,
+  mobile: true,
+  openNewTab: false,
+  createdAt: "",
+  updatedAt: "",
+}));
+
+const navigationTranslationKeys: Record<string, string> = {
+  "/": "home",
+  "/latest": "latest",
+  "/sri-lanka": "sriLanka",
+  "/world": "world",
+  "/politics": "politics",
+  "/business": "business",
+  "/sports": "sports",
+  "/entertainment": "entertainment",
+  "/technology": "technology",
+  "/lifestyle": "lifestyle",
+  "/video": "video",
+  "/watch-live": "watchLive",
 };
 
 /* =========================================================
@@ -289,6 +334,16 @@ function isWatchLiveItem(
   );
 }
 
+function isHomeItem(
+  item: HeaderMenuItem,
+): boolean {
+  return (
+    normalizeInternalHref(
+      item.href,
+    ) === "/"
+  );
+}
+
 /* =========================================================
    WEATHER
 ========================================================= */
@@ -476,6 +531,7 @@ function MenuLink({
 ========================================================= */
 
 export default function Header() {
+  const translate = useTranslations();
   const {
     theme,
     toggleTheme,
@@ -489,6 +545,44 @@ export default function Header() {
 
   const language =
     getApiLanguage(locale);
+
+  const localizedFallbackMenu = useMemo(
+    () =>
+      fallbackMenuItems.map((item) => {
+        const translationKey =
+          navigationTranslationKeys[
+            normalizeInternalHref(item.href)
+          ];
+
+        return {
+          ...item,
+          language,
+          label:
+            translationKey && language !== "EN"
+              ? translate(`Navigation.${translationKey}`)
+              : item.label,
+        };
+      }),
+    [language, translate],
+  );
+
+  const homeMenuItem = useMemo<HeaderMenuItem>(
+    () => ({
+      id: "system-home",
+      language,
+      label: translate("Navigation.home"),
+      href: "/",
+      position: -1,
+      isVisible: true,
+      type: "System",
+      desktop: true,
+      mobile: true,
+      openNewTab: false,
+      createdAt: "",
+      updatedAt: "",
+    }),
+    [language, translate],
+  );
 
   /* =======================================================
      STATE
@@ -538,7 +632,7 @@ export default function Header() {
     setMenuItems,
   ] = useState<
     HeaderMenuItem[]
-  >([]);
+  >(localizedFallbackMenu);
 
   const [
     siteConfig,
@@ -550,7 +644,7 @@ export default function Header() {
   const [
     headerLoading,
     setHeaderLoading,
-  ] = useState(true);
+  ] = useState(false);
 
   const darkMode =
     theme === "dark";
@@ -565,8 +659,6 @@ export default function Header() {
 
     async function loadHeader() {
       try {
-        setHeaderLoading(true);
-
         const response =
           await fetch(
             `/api/public/header?language=${language}`,
@@ -599,7 +691,22 @@ export default function Header() {
         }
 
         setMenuItems(
-          data.menu
+          data.menu.map((item) => {
+            const translationKey =
+              navigationTranslationKeys[
+                normalizeInternalHref(item.href)
+              ];
+
+            return {
+              ...item,
+              label:
+                translationKey &&
+                item.usesEnglishFallback &&
+                data.language !== "EN"
+                  ? translate(`Navigation.${translationKey}`)
+                  : item.label,
+            };
+          }),
         );
 
         if (data.site) {
@@ -662,7 +769,7 @@ export default function Header() {
     return () => {
       controller.abort();
     };
-  }, [language]);
+  }, [language, translate]);
 
   /* =======================================================
      DATE
@@ -869,39 +976,41 @@ export default function Header() {
 
   const desktopMenuItems =
     useMemo(() => {
-      return [...menuItems]
+      const remainingItems = [...menuItems]
         .filter(
           (item) =>
             item.isVisible &&
             item.desktop &&
-            !isWatchLiveItem(
-              item
-            )
+            !isWatchLiveItem(item) &&
+            !isHomeItem(item),
         )
         .sort(
           (a, b) =>
             a.position -
             b.position
         );
-    }, [menuItems]);
+
+      return [homeMenuItem, ...remainingItems];
+    }, [homeMenuItem, menuItems]);
 
   const mobileMenuItems =
     useMemo(() => {
-      return [...menuItems]
+      const remainingItems = [...menuItems]
         .filter(
           (item) =>
             item.isVisible &&
             item.mobile &&
-            !isWatchLiveItem(
-              item
-            )
+            !isWatchLiveItem(item) &&
+            !isHomeItem(item),
         )
         .sort(
           (a, b) =>
             a.position -
             b.position
         );
-    }, [menuItems]);
+
+      return [homeMenuItem, ...remainingItems];
+    }, [homeMenuItem, menuItems]);
 
   const watchLiveItem =
     useMemo(() => {
@@ -969,7 +1078,7 @@ export default function Header() {
 
             <span className="truncate text-sm font-medium lg:text-[15px] xl:text-base">
               {currentDate ||
-                "Loading date..."}
+                "TV SUPREME"}
             </span>
 
             <span className="opacity-50">

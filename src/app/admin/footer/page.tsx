@@ -468,7 +468,13 @@ export default function FooterAdminPage() {
     );
 
   useEffect(() => {
-    void loadFooter();
+    const loadTimer = window.setTimeout(() => {
+      void loadFooter();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(loadTimer);
+    };
   }, [loadFooter]);
 
   /* =======================================================

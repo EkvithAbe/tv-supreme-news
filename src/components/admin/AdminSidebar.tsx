@@ -24,13 +24,28 @@ import {
   Users,
   Settings,
   ShieldCheck,
+  UserRound,
 } from "lucide-react";
 
 /* =========================================================
    ADMIN NAVIGATION
 ========================================================= */
 
-const menuGroups = [
+type CmsRole = "ADMIN" | "EDITOR";
+
+type NavigationItem = {
+  label: string;
+  href: string;
+  icon: React.ElementType;
+  adminOnly?: boolean;
+};
+
+type NavigationGroup = {
+  title: string;
+  items: NavigationItem[];
+};
+
+const menuGroups: NavigationGroup[] = [
   {
     title: "Overview",
 
@@ -39,6 +54,7 @@ const menuGroups = [
         label: "Dashboard",
         href: "/admin",
         icon: LayoutDashboard,
+        adminOnly: true,
       },
     ],
   },
@@ -93,6 +109,7 @@ const menuGroups = [
         label: "Breaking News",
         href: "/admin/breaking-news",
         icon: Zap,
+        adminOnly: true,
       },
     ],
   },
@@ -117,24 +134,28 @@ const menuGroups = [
         label: "Live TV",
         href: "/admin/live-tv",
         icon: Radio,
+        adminOnly: true,
       },
 
       {
         label: "Media Library",
         href: "/admin/media",
         icon: ImageIcon,
+        adminOnly: true,
       },
 
       {
         label: "Categories",
         href: "/admin/categories",
         icon: FolderTree,
+        adminOnly: true,
       },
 
       {
         label: "Homepage",
         href: "/admin/homepage",
         icon: Home,
+        adminOnly: true,
       },
     ],
   },
@@ -147,18 +168,21 @@ const menuGroups = [
         label: "Pages",
         href: "/admin/pages",
         icon: File,
+        adminOnly: true,
       },
 
       {
         label: "Menu",
         href: "/admin/menu",
         icon: MenuIcon,
+        adminOnly: true,
       },
 
       {
         label: "Footer",
         href: "/admin/footer",
         icon: PanelBottom,
+        adminOnly: true,
       },
     ],
   },
@@ -171,12 +195,26 @@ const menuGroups = [
         label: "Users & Roles",
         href: "/admin/users",
         icon: Users,
+        adminOnly: true,
       },
 
       {
         label: "Settings",
         href: "/admin/settings",
         icon: Settings,
+        adminOnly: true,
+      },
+    ],
+  },
+
+  {
+    title: "Account",
+
+    items: [
+      {
+        label: "My Profile",
+        href: "/admin/profile",
+        icon: UserRound,
       },
     ],
   },
@@ -186,9 +224,28 @@ const menuGroups = [
    SIDEBAR
 ========================================================= */
 
-export default function AdminSidebar() {
+export default function AdminSidebar({
+  role,
+}: {
+  role: CmsRole;
+}) {
   const pathname =
     usePathname() || "";
+
+  const visibleMenuGroups =
+    menuGroups
+      .map((group) => ({
+        ...group,
+        items: group.items.filter(
+          (item) =>
+            role === "ADMIN" ||
+            !item.adminOnly,
+        ),
+      }))
+      .filter(
+        (group) =>
+          group.items.length > 0,
+      );
 
   /* =======================================================
      ACTIVE ITEM
@@ -256,7 +313,11 @@ export default function AdminSidebar() {
       >
 
         <Link
-          href="/admin"
+          href={
+            role === "EDITOR"
+              ? "/admin/news"
+              : "/admin"
+          }
           className="block transition-opacity hover:opacity-90"
           aria-label="TV SUPREME Admin"
         >
@@ -316,7 +377,7 @@ export default function AdminSidebar() {
 
         <div className="space-y-5">
 
-          {menuGroups.map(
+          {visibleMenuGroups.map(
             (group) => (
               <section
                 key={
@@ -481,7 +542,9 @@ export default function AdminSidebar() {
           <div className="hidden min-w-0 md:block">
 
             <p className="truncate text-xs font-semibold text-white">
-              Admin Panel
+              {role === "ADMIN"
+                ? "Admin Panel"
+                : "Editor Panel"}
             </p>
 
             <p className="truncate text-[10px] text-slate-400">

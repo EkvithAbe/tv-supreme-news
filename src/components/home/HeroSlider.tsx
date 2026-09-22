@@ -144,7 +144,13 @@ export default function HeroSlider({
       currentIndex >= totalSlides &&
       totalSlides > 0
     ) {
-      setCurrentIndex(0);
+      const resetTimer = window.setTimeout(() => {
+        setCurrentIndex(0);
+      }, 0);
+
+      return () => {
+        window.clearTimeout(resetTimer);
+      };
     }
   }, [currentIndex, totalSlides]);
 

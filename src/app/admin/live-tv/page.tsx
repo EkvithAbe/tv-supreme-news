@@ -209,7 +209,13 @@ export default function LiveTVPage() {
   };
 
   useEffect(() => {
-    void loadSettings();
+    const loadTimer = window.setTimeout(() => {
+      void loadSettings();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(loadTimer);
+    };
   }, []);
 
   /*
@@ -1174,7 +1180,7 @@ export default function LiveTVPage() {
         <div className="border-t border-slate-100 bg-slate-50/70 px-5 py-4">
           <p className="text-xs leading-5 text-slate-400">
             Live TV settings are now loaded from and
-            saved to PostgreSQL through the CMS API.
+            saved to MySQL through the CMS API.
           </p>
         </div>
       </section>

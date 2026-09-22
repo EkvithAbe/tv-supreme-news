@@ -179,7 +179,6 @@ export async function getArticleAuthors() {
         in: [
           "ADMIN",
           "EDITOR",
-          "JOURNALIST",
         ],
       },
     },
@@ -474,19 +473,16 @@ export async function getArticles(
               {
                 title: {
                   contains: text,
-                  mode: "insensitive",
                 },
               },
               {
                 summary: {
                   contains: text,
-                  mode: "insensitive",
                 },
               },
               {
                 content: {
                   contains: text,
-                  mode: "insensitive",
                 },
               },
             ],

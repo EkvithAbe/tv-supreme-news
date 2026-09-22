@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
 
 import CategoryPage from "@/components/category/CategoryPage";
+import PublicPageRenderer from "@/components/pages/PublicPageRenderer";
 import { getArticles } from "@/lib/data/articles";
+import { getPageBySlug } from "@/lib/data/pages";
+import { getPageBuilderBlocks } from "@/lib/page-builder";
 import { prisma } from "@/lib/prisma";
 
 type PageProps = {
@@ -30,7 +33,7 @@ function getLanguage(
   return "EN";
 }
 
-export default async function CategoryRoute({
+export default async function PublicSlugRoute({
   params,
 }: PageProps) {
   const { locale, slug } = await params;
@@ -61,10 +64,8 @@ export default async function CategoryRoute({
   }
 
   /*
-   * Find the category directly from PostgreSQL.
-   *
-   * Nothing is hardcoded here.
-   * The URL slug comes from the database category slug.
+   * All other category routes are resolved directly
+   * from MySQL.
    */
   const category =
     await prisma.category.findUnique({
@@ -77,12 +78,43 @@ export default async function CategoryRoute({
       },
     });
 
-  /*
-   * If PostgreSQL has no category with this slug,
-   * then the route does not exist.
-   */
   if (!category) {
-    notFound();
+    const page = await getPageBySlug(
+      normalizedSlug,
+      language,
+    );
+
+    if (!page || page.status !== "PUBLISHED") {
+      notFound();
+    }
+
+    const mediaIds = getPageBuilderBlocks(page.content)
+      .map((block) => block.mediaId)
+      .filter((mediaId): mediaId is string => Boolean(mediaId));
+
+    const media = mediaIds.length
+      ? await prisma.media.findMany({
+          where: {
+            id: {
+              in: mediaIds,
+            },
+          },
+          select: {
+            id: true,
+            url: true,
+            filename: true,
+            type: true,
+            altText: true,
+          },
+        })
+      : [];
+
+    return (
+      <PublicPageRenderer
+        page={page}
+        media={media}
+      />
+    );
   }
 
   /*

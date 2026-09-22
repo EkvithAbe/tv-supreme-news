@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
+import { getStaticTranslator } from "@/lib/static-page-translations";
 import {
   Clock3,
   Globe2,
@@ -10,17 +11,236 @@ import {
   Phone,
   Send,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useLocale } from "next-intl";
+import { useState, type ReactNode } from "react";
+
+const contactTranslations = {
+  si: {
+    "Let's Connect": "සම්බන්ධ වෙමු",
+    "Contact Us": "අප අමතන්න",
+    "Have a question, story tip, feedback or business enquiry? Our team would love to hear from you.":
+      "ඔබට ප්‍රශ්නයක්, පුවත් තොරතුරක්, ප්‍රතිචාරයක් හෝ ව්‍යාපාරික විමසීමක් තිබේද? ඔබගෙන් ඇසීමට අපගේ කණ්ඩායම සතුටු වේ.",
+    "Call Us": "අප අමතන්න",
+    "Mon–Fri, 9:00 AM–5:00 PM": "සඳුදා සිට සිකුරාදා දක්වා, පෙ.ව. 9.00–ප.ව. 5.00",
+    "Email Us": "අපට විද්‍යුත් තැපැල් කරන්න",
+    "We usually reply within 1–2 business days": "සාමාන්‍යයෙන් වැඩ කරන දින 1–2ක් ඇතුළත පිළිතුරු ලබා දෙමු",
+    "Visit Us": "අප වෙත පැමිණෙන්න",
+    "Colombo, Sri Lanka": "කොළඹ, ශ්‍රී ලංකාව",
+    "By appointment": "පූර්ව හමුවීමක් මත",
+    "Newsroom": "පුවත් මධ්‍යස්ථානය",
+    "Always Connected": "සෑමවිටම සම්බන්ධයි",
+    "Breaking news and editorial enquiries": "හදිසි පුවත් හා කතුවැකි විමසීම්",
+    "Send Us a Message": "අපට පණිවිඩයක් එවන්න",
+    "We're here to help": "ඔබට සහාය වීමට අපි සූදානම්",
+    "Send us your message and the appropriate TV SUPREME team will get back to you.":
+      "ඔබේ පණිවිඩය අපට එවන්න; අදාළ TV SUPREME කණ්ඩායම ඔබ වෙත නැවත සම්බන්ධ වේ.",
+    "Full Name": "සම්පූර්ණ නම",
+    "Enter your full name": "ඔබේ සම්පූර්ණ නම ඇතුළත් කරන්න",
+    "Email Address": "විද්‍යුත් තැපැල් ලිපිනය",
+    "Phone Number": "දුරකථන අංකය",
+    "Subject": "මාතෘකාව",
+    "How can we help?": "අපට ඔබට සහාය විය හැක්කේ කෙසේද?",
+    "Message": "පණිවිඩය",
+    "Write your message here...": "ඔබේ පණිවිඩය මෙහි ලියන්න...",
+    "I agree to the TV SUPREME": "මම TV SUPREME හි",
+    "Privacy Policy": "පෞද්ගලිකත්ව ප්‍රතිපත්තිය",
+    " and understand that my information will be used to respond to this enquiry.":
+      "ට එකඟ වන අතර, මෙම විමසීමට පිළිතුරු සැපයීම සඳහා මගේ තොරතුරු භාවිත කරන බව මම තේරුම් ගනිමි.",
+    "Sending...": "යවමින් පවතී...",
+    "Send Message": "පණිවිඩය යවන්න",
+    "We could not send your message right now.": "ඔබේ පණිවිඩය මේ මොහොතේ යැවීමට නොහැකි විය.",
+    "Please wait a minute before sending another message.":
+      "තවත් පණිවිඩයක් යැවීමට පෙර කරුණාකර මිනිත්තුවක් රැඳී සිටින්න.",
+    "Please complete all required contact fields.": "අවශ්‍ය සියලු සම්බන්ධතා ක්ෂේත්‍ර සම්පූර්ණ කරන්න.",
+    "Please enter a valid email address.": "වලංගු විද්‍යුත් තැපැල් ලිපිනයක් ඇතුළත් කරන්න.",
+    "Contact email is not configured yet. Please try again later.":
+      "සම්බන්ධතා විද්‍යුත් තැපෑල තවම සකසා නැත. කරුණාකර පසුව නැවත උත්සාහ කරන්න.",
+    "We could not send your message right now. Please try again later.":
+      "ඔබේ පණිවිඩය මේ මොහොතේ යැවීමට නොහැකි විය. කරුණාකර පසුව නැවත උත්සාහ කරන්න.",
+    "Your message has been sent. We will get back to you soon.":
+      "ඔබේ පණිවිඩය යවා ඇත. අපි ඉක්මනින් ඔබ වෙත නැවත සම්බන්ධ වෙමු.",
+    "Contact Channels": "සම්බන්ධ වීමේ මාර්ග",
+    "Let's talk": "කතා කරමු",
+    "Choose the most convenient way to reach the TV SUPREME team.":
+      "TV SUPREME කණ්ඩායම වෙත ළඟා වීමට ඔබට පහසුම ක්‍රමය තෝරන්න.",
+    "General Enquiries": "සාමාන්‍ය විමසීම්",
+    "Business": "ව්‍යාපාරික විමසීම්",
+    "Our Office": "අපගේ කාර්යාලය",
+    "Colombo": "කොළඹ",
+    "Sri Lanka": "ශ්‍රී ලංකාව",
+    "Serving audiences across Sri Lanka and beyond": "ශ්‍රී ලංකාව පුරා සහ ඉන් ඔබ්බට ප්‍රේක්ෂකයන්ට සේවය කරමින්",
+    "Follow TV SUPREME": "TV SUPREME අනුගමනය කරන්න",
+    "Stay connected with our latest stories and updates.": "අපගේ නවතම කතා සහ යාවත්කාලීන සමඟ සම්බන්ධව සිටින්න.",
+    "Website": "වෙබ් අඩවිය",
+    "Follow TV SUPREME on Facebook": "Facebook හි TV SUPREME අනුගමනය කරන්න",
+    "Follow TV SUPREME on Instagram": "Instagram හි TV SUPREME අනුගමනය කරන්න",
+    "Follow TV SUPREME on YouTube": "YouTube හි TV SUPREME අනුගමනය කරන්න",
+    "Visit the TV SUPREME website": "TV SUPREME වෙබ් අඩවියට පිවිසෙන්න",
+    "Frequently Asked Questions": "නිතර අසන ප්‍රශ්න",
+    "Here are some common questions about contacting TV SUPREME.":
+      "TV SUPREME සම්බන්ධ කරගැනීම පිළිබඳ නිතර අසන ප්‍රශ්න කිහිපයක් මෙන්න.",
+    "How can I send a news tip?": "පුවත් තොරතුරක් යවන්නේ කෙසේද?",
+    "Use the contact form above and provide the details of the story. Our newsroom team can review the information and follow up when appropriate.":
+      "ඉහත සම්බන්ධතා පෝරමය භාවිත කර කතාවේ විස්තර ලබාදෙන්න. අපගේ පුවත් මධ්‍යස්ථාන කණ්ඩායම තොරතුරු සමාලෝචනය කර අවශ්‍ය විට නැවත සම්බන්ධ විය හැක.",
+    "How can I contact the advertising team?": "වෙළඳ දැන්වීම් කණ්ඩායම සම්බන්ධ කරගන්නේ කෙසේද?",
+    "Use the business enquiry channel or visit the Advertise page for information about advertising opportunities.":
+      "ව්‍යාපාරික විමසීම් මාර්ගය භාවිත කරන්න, නැතහොත් වෙළඳ දැන්වීම් අවස්ථා පිළිබඳ තොරතුරු සඳහා වෙළඳ දැන්වීම් පිටුවට පිවිසෙන්න.",
+    "Can I provide feedback about the website?": "වෙබ් අඩවිය පිළිබඳ ප්‍රතිචාර ලබා දිය හැකිද?",
+    "Yes. We welcome suggestions and feedback about the TV SUPREME website and digital experience.":
+      "ඔව්. TV SUPREME වෙබ් අඩවිය සහ ඩිජිටල් අත්දැකීම පිළිබඳ යෝජනා හා ප්‍රතිචාර අපි සාදරයෙන් පිළිගනිමු.",
+    "Can I contact TV SUPREME for media enquiries?": "මාධ්‍ය විමසීම් සඳහා TV SUPREME සම්බන්ධ කරගත හැකිද?",
+    "Yes. Please use the contact form and select an appropriate subject so your request can be directed to the relevant team.":
+      "ඔව්. ඔබගේ ඉල්ලීම අදාළ කණ්ඩායම වෙත යොමු කිරීමට, සම්බන්ධතා පෝරමය භාවිත කර සුදුසු මාතෘකාවක් තෝරන්න.",
+    "Have something important to share?": "බෙදාගැනීමට වැදගත් යමක් තිබේද?",
+    "Whether it's a story tip, feedback or a business enquiry, we're ready to hear from you.":
+      "එය පුවත් තොරතුරක්, ප්‍රතිචාරයක් හෝ ව්‍යාපාරික විමසීමක් වුවද, ඔබගෙන් ඇසීමට අපි සූදානම්.",
+    "Latest News": "නවතම පුවත්",
+  },
+  ta: {
+    "Let's Connect": "தொடர்பில் இருப்போம்",
+    "Contact Us": "எங்களைத் தொடர்புகொள்ளவும்",
+    "Have a question, story tip, feedback or business enquiry? Our team would love to hear from you.":
+      "உங்களிடம் கேள்வி, செய்திக் குறிப்பு, கருத்து அல்லது வணிக விசாரணை உள்ளதா? உங்களிடமிருந்து கேட்க எங்கள் குழு விரும்புகிறது.",
+    "Call Us": "எங்களை அழைக்கவும்",
+    "Mon–Fri, 9:00 AM–5:00 PM": "திங்கள்–வெள்ளி, காலை 9.00–மாலை 5.00",
+    "Email Us": "எங்களுக்கு மின்னஞ்சல் அனுப்பவும்",
+    "We usually reply within 1–2 business days": "பொதுவாக 1–2 வேலை நாட்களுக்குள் பதிலளிப்போம்",
+    "Visit Us": "எங்களைச் சந்திக்கவும்",
+    "Colombo, Sri Lanka": "கொழும்பு, இலங்கை",
+    "By appointment": "முன்பதிவு மூலம்",
+    "Newsroom": "செய்தியகம்",
+    "Always Connected": "எப்போதும் இணைந்திருப்போம்",
+    "Breaking news and editorial enquiries": "அவசரச் செய்திகள் மற்றும் ஆசிரியர் குழு விசாரணைகள்",
+    "Send Us a Message": "எங்களுக்கு ஒரு செய்தி அனுப்பவும்",
+    "We're here to help": "உங்களுக்கு உதவ நாங்கள் இருக்கிறோம்",
+    "Send us your message and the appropriate TV SUPREME team will get back to you.":
+      "உங்கள் செய்தியை அனுப்புங்கள்; பொருத்தமான TV SUPREME குழு உங்களைத் தொடர்புகொள்ளும்.",
+    "Full Name": "முழுப் பெயர்",
+    "Enter your full name": "உங்கள் முழுப் பெயரை உள்ளிடவும்",
+    "Email Address": "மின்னஞ்சல் முகவரி",
+    "Phone Number": "தொலைபேசி எண்",
+    "Subject": "பொருள்",
+    "How can we help?": "நாங்கள் எவ்வாறு உதவலாம்?",
+    "Message": "செய்தி",
+    "Write your message here...": "உங்கள் செய்தியை இங்கே எழுதவும்...",
+    "I agree to the TV SUPREME": "TV SUPREME-இன்",
+    "Privacy Policy": "தனியுரிமைக் கொள்கை",
+    " and understand that my information will be used to respond to this enquiry.":
+      "க்கு நான் ஒப்புக்கொள்கிறேன்; இந்த விசாரணைக்கு பதிலளிக்க எனது தகவல்கள் பயன்படுத்தப்படும் என்பதை புரிந்துகொள்கிறேன்.",
+    "Sending...": "அனுப்பப்படுகிறது...",
+    "Send Message": "செய்தியை அனுப்பவும்",
+    "We could not send your message right now.": "உங்கள் செய்தியை தற்போது அனுப்ப முடியவில்லை.",
+    "Please wait a minute before sending another message.":
+      "மற்றொரு செய்தியை அனுப்புவதற்கு முன் ஒரு நிமிடம் காத்திருக்கவும்.",
+    "Please complete all required contact fields.": "தேவையான அனைத்து தொடர்பு விவரங்களையும் பூர்த்தி செய்யவும்.",
+    "Please enter a valid email address.": "சரியான மின்னஞ்சல் முகவரியை உள்ளிடவும்.",
+    "Contact email is not configured yet. Please try again later.":
+      "தொடர்பு மின்னஞ்சல் இன்னும் அமைக்கப்படவில்லை. பின்னர் மீண்டும் முயற்சிக்கவும்.",
+    "We could not send your message right now. Please try again later.":
+      "உங்கள் செய்தியை தற்போது அனுப்ப முடியவில்லை. பின்னர் மீண்டும் முயற்சிக்கவும்.",
+    "Your message has been sent. We will get back to you soon.":
+      "உங்கள் செய்தி அனுப்பப்பட்டுள்ளது. விரைவில் உங்களைத் தொடர்புகொள்வோம்.",
+    "Contact Channels": "தொடர்பு வழிகள்",
+    "Let's talk": "பேசலாம்",
+    "Choose the most convenient way to reach the TV SUPREME team.":
+      "TV SUPREME குழுவைத் தொடர்புகொள்ள உங்களுக்கு மிகவும் வசதியான வழியைத் தேர்ந்தெடுக்கவும்.",
+    "General Enquiries": "பொதுவான விசாரணைகள்",
+    "Business": "வணிக விசாரணைகள்",
+    "Our Office": "எங்கள் அலுவலகம்",
+    "Colombo": "கொழும்பு",
+    "Sri Lanka": "இலங்கை",
+    "Serving audiences across Sri Lanka and beyond": "இலங்கை முழுவதும் மற்றும் அதற்கு அப்பாலான பார்வையாளர்களுக்கு சேவை செய்கிறோம்",
+    "Follow TV SUPREME": "TV SUPREME-ஐப் பின்தொடரவும்",
+    "Stay connected with our latest stories and updates.": "எங்கள் சமீபத்திய செய்திகள் மற்றும் புதுப்பிப்புகளுடன் இணைந்திருங்கள்.",
+    "Website": "இணையதளம்",
+    "Follow TV SUPREME on Facebook": "Facebook-இல் TV SUPREME-ஐப் பின்தொடரவும்",
+    "Follow TV SUPREME on Instagram": "Instagram-இல் TV SUPREME-ஐப் பின்தொடரவும்",
+    "Follow TV SUPREME on YouTube": "YouTube-இல் TV SUPREME-ஐப் பின்தொடரவும்",
+    "Visit the TV SUPREME website": "TV SUPREME இணையதளத்தைப் பார்வையிடவும்",
+    "Frequently Asked Questions": "அடிக்கடி கேட்கப்படும் கேள்விகள்",
+    "Here are some common questions about contacting TV SUPREME.":
+      "TV SUPREME-ஐத் தொடர்புகொள்வது குறித்த பொதுவான கேள்விகள் சில இங்கே உள்ளன.",
+    "How can I send a news tip?": "செய்திக் குறிப்பை எவ்வாறு அனுப்பலாம்?",
+    "Use the contact form above and provide the details of the story. Our newsroom team can review the information and follow up when appropriate.":
+      "மேலுள்ள தொடர்புப் படிவத்தைப் பயன்படுத்தி செய்தியின் விவரங்களை வழங்கவும். எங்கள் செய்தியகக் குழு தகவலை மதிப்பாய்வு செய்து, தேவையானபோது உங்களைத் தொடர்புகொள்ளும்.",
+    "How can I contact the advertising team?": "விளம்பரக் குழுவை எவ்வாறு தொடர்புகொள்வது?",
+    "Use the business enquiry channel or visit the Advertise page for information about advertising opportunities.":
+      "வணிக விசாரணை வழியைப் பயன்படுத்தவும் அல்லது விளம்பர வாய்ப்புகள் பற்றிய தகவலுக்கு விளம்பரப் பக்கத்தைப் பார்வையிடவும்.",
+    "Can I provide feedback about the website?": "இணையதளம் குறித்து கருத்து தெரிவிக்கலாமா?",
+    "Yes. We welcome suggestions and feedback about the TV SUPREME website and digital experience.":
+      "ஆம். TV SUPREME இணையதளம் மற்றும் டிஜிட்டல் அனுபவம் குறித்த உங்கள் ஆலோசனைகளையும் கருத்துகளையும் நாங்கள் வரவேற்கிறோம்.",
+    "Can I contact TV SUPREME for media enquiries?": "ஊடக விசாரணைகளுக்காக TV SUPREME-ஐத் தொடர்புகொள்ளலாமா?",
+    "Yes. Please use the contact form and select an appropriate subject so your request can be directed to the relevant team.":
+      "ஆம். உங்கள் கோரிக்கையைப் பொருத்தமான குழுவுக்கு அனுப்ப, தொடர்புப் படிவத்தைப் பயன்படுத்தி சரியான பொருளைத் தேர்ந்தெடுக்கவும்.",
+    "Have something important to share?": "பகிர வேண்டிய முக்கியமான தகவல் உள்ளதா?",
+    "Whether it's a story tip, feedback or a business enquiry, we're ready to hear from you.":
+      "அது செய்திக் குறிப்பு, கருத்து அல்லது வணிக விசாரணையாக இருந்தாலும், உங்களிடமிருந்து கேட்க நாங்கள் தயாராக உள்ளோம்.",
+    "Latest News": "சமீபத்திய செய்திகள்",
+  },
+};
 
 export default function ContactPage() {
+  const locale = useLocale();
+  const t = getStaticTranslator(locale, contactTranslations);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [formSuccess, setFormSuccess] = useState("");
+
   const handleSubmit = (
     event: React.FormEvent<HTMLFormElement>
   ) => {
     event.preventDefault();
 
-    window.alert(
-      "Thank you for contacting TV SUPREME. Your message form is ready for backend integration."
-    );
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+
+    setIsSubmitting(true);
+    setFormError("");
+    setFormSuccess("");
+
+    void fetch("/api/contact", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: formData.get("name"),
+        email: formData.get("email"),
+        phone: formData.get("phone"),
+        subject: formData.get("subject"),
+        message: formData.get("message"),
+        locale,
+      }),
+    })
+      .then(async (response) => {
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(
+            t(
+              data.error ||
+                "We could not send your message right now.",
+            ),
+          );
+        }
+
+        form.reset();
+        setFormSuccess(
+          t(data.message),
+        );
+      })
+      .catch((error) => {
+        setFormError(
+          error instanceof Error
+            ? error.message
+            : t(
+                "We could not send your message right now.",
+              ),
+        );
+      })
+      .finally(() => {
+        setIsSubmitting(false);
+      });
   };
 
   return (
@@ -38,16 +258,17 @@ export default function ContactPage() {
             <div className="max-w-3xl">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-white backdrop-blur">
                 <MessageCircle size={14} />
-                Let&apos;s Connect
+                {t("Let's Connect")}
               </div>
 
               <h1 className="mt-5 text-4xl font-black tracking-tight text-white sm:text-5xl lg:text-6xl">
-                Contact Us
+                {t("Contact Us")}
               </h1>
 
               <p className="mt-4 max-w-2xl text-sm leading-7 text-white/80 sm:text-base">
-                Have a question, story tip, feedback or business
-                enquiry? Our team would love to hear from you.
+                {t(
+                  "Have a question, story tip, feedback or business enquiry? Our team would love to hear from you.",
+                )}
               </p>
             </div>
           </div>
@@ -62,30 +283,30 @@ export default function ContactPage() {
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
             <ContactInfoCard
               icon={<Phone size={20} />}
-              title="Call Us"
+              title={t("Call Us")}
               value="+94 11 000 0000"
-              note="Mon–Fri, 9:00 AM–5:00 PM"
+              note={t("Mon–Fri, 9:00 AM–5:00 PM")}
             />
 
             <ContactInfoCard
               icon={<Mail size={20} />}
-              title="Email Us"
+              title={t("Email Us")}
               value="info@tvsupreme.lk"
-              note="We usually reply within 1–2 business days"
+              note={t("We usually reply within 1–2 business days")}
             />
 
             <ContactInfoCard
               icon={<MapPin size={20} />}
-              title="Visit Us"
-              value="Colombo, Sri Lanka"
-              note="By appointment"
+              title={t("Visit Us")}
+              value={t("Colombo, Sri Lanka")}
+              note={t("By appointment")}
             />
 
             <ContactInfoCard
               icon={<Clock3 size={20} />}
-              title="Newsroom"
-              value="Always Connected"
-              note="Breaking news and editorial enquiries"
+              title={t("Newsroom")}
+              value={t("Always Connected")}
+              note={t("Breaking news and editorial enquiries")}
             />
           </div>
         </div>
@@ -103,16 +324,17 @@ export default function ContactPage() {
             <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-200 px-6 py-6 sm:px-8">
                 <span className="text-sm font-bold uppercase tracking-[0.16em] text-pink-600">
-                  Send Us a Message
+                  {t("Send Us a Message")}
                 </span>
 
                 <h2 className="mt-2 text-2xl font-black text-[#111d4a] sm:text-3xl">
-                  We&apos;re here to help
+                  {t("We're here to help")}
                 </h2>
 
                 <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
-                  Send us your message and the appropriate TV SUPREME
-                  team will get back to you.
+                  {t(
+                    "Send us your message and the appropriate TV SUPREME team will get back to you.",
+                  )}
                 </p>
               </div>
 
@@ -120,18 +342,36 @@ export default function ContactPage() {
                 onSubmit={handleSubmit}
                 className="space-y-5 p-6 sm:p-8"
               >
+                {formError && (
+                  <p
+                    role="alert"
+                    className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
+                  >
+                    {formError}
+                  </p>
+                )}
+
+                {formSuccess && (
+                  <p
+                    role="status"
+                    className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700"
+                  >
+                    {formSuccess}
+                  </p>
+                )}
+
                 {/* Name + Email */}
                 <div className="grid gap-5 md:grid-cols-2">
                   <FormField
                     id="name"
-                    label="Full Name"
-                    placeholder="Enter your full name"
+                    label={t("Full Name")}
+                    placeholder={t("Enter your full name")}
                     required
                   />
 
                   <FormField
                     id="email"
-                    label="Email Address"
+                    label={t("Email Address")}
                     type="email"
                     placeholder="you@example.com"
                     required
@@ -142,14 +382,14 @@ export default function ContactPage() {
                 <div className="grid gap-5 md:grid-cols-2">
                   <FormField
                     id="phone"
-                    label="Phone Number"
+                    label={t("Phone Number")}
                     placeholder="+94 XX XXX XXXX"
                   />
 
                   <FormField
                     id="subject"
-                    label="Subject"
-                    placeholder="How can we help?"
+                    label={t("Subject")}
+                    placeholder={t("How can we help?")}
                     required
                   />
                 </div>
@@ -160,7 +400,7 @@ export default function ContactPage() {
                     htmlFor="message"
                     className="mb-2 block text-sm font-semibold text-slate-700"
                   >
-                    Message
+                    {t("Message")}
                   </label>
 
                   <textarea
@@ -168,7 +408,7 @@ export default function ContactPage() {
                     name="message"
                     rows={7}
                     required
-                    placeholder="Write your message here..."
+                    placeholder={t("Write your message here...")}
                     className="w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-pink-400 focus:ring-4 focus:ring-pink-50"
                   />
                 </div>
@@ -182,25 +422,29 @@ export default function ContactPage() {
                   />
 
                   <span className="text-xs leading-5 text-slate-500">
-                    I agree to the TV SUPREME{" "}
+                    {t("I agree to the TV SUPREME")}{" "}
                     <Link
                       href="/legal/privacy-policy"
                       className="font-semibold text-pink-600 hover:text-purple-600"
                     >
-                      Privacy Policy
-                    </Link>{" "}
-                    and understand that my information will be used
-                    to respond to this enquiry.
+                      {t("Privacy Policy")}
+                    </Link>
+                    {t(
+                      " and understand that my information will be used to respond to this enquiry.",
+                    )}
                   </span>
                 </label>
 
                 {/* Submit */}
                 <button
                   type="submit"
+                  disabled={isSubmitting}
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:opacity-90"
                 >
                   <Send size={16} />
-                  Send Message
+                  {isSubmitting
+                    ? t("Sending...")
+                    : t("Send Message")}
                 </button>
               </form>
             </div>
@@ -212,34 +456,35 @@ export default function ContactPage() {
               {/* Contact Channels */}
               <section className="overflow-hidden rounded-[24px] bg-[#111d4a] p-6 text-white shadow-sm sm:p-7">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/60">
-                  Contact Channels
+                  {t("Contact Channels")}
                 </p>
 
                 <h2 className="mt-3 text-2xl font-black">
-                  Let&apos;s talk
+                  {t("Let's talk")}
                 </h2>
 
                 <p className="mt-3 text-sm leading-6 text-white/70">
-                  Choose the most convenient way to reach the TV
-                  SUPREME team.
+                  {t(
+                    "Choose the most convenient way to reach the TV SUPREME team.",
+                  )}
                 </p>
 
                 <div className="mt-6 space-y-3">
                   <ContactChannel
                     icon={<Mail size={17} />}
-                    title="General Enquiries"
+                    title={t("General Enquiries")}
                     value="info@tvsupreme.lk"
                   />
 
                   <ContactChannel
                     icon={<NewspaperIcon />}
-                    title="Newsroom"
+                    title={t("Newsroom")}
                     value="news@tvsupreme.lk"
                   />
 
                   <ContactChannel
                     icon={<BriefcaseIcon />}
-                    title="Business"
+                    title={t("Business")}
                     value="business@tvsupreme.lk"
                   />
                 </div>
@@ -252,15 +497,15 @@ export default function ContactPage() {
                 </div>
 
                 <h3 className="mt-4 text-lg font-bold text-[#111d4a]">
-                  Our Office
+                  {t("Our Office")}
                 </h3>
 
                 <p className="mt-2 text-sm leading-6 text-slate-500">
                   TV SUPREME
                   <br />
-                  Colombo
+                  {t("Colombo")}
                   <br />
-                  Sri Lanka
+                  {t("Sri Lanka")}
                 </p>
 
                 <div className="mt-5 flex items-center gap-2 text-xs font-semibold text-slate-500">
@@ -268,44 +513,50 @@ export default function ContactPage() {
                     size={14}
                     className="text-pink-600"
                   />
-                  Serving audiences across Sri Lanka and beyond
+                  {t("Serving audiences across Sri Lanka and beyond")}
                 </div>
               </section>
 
               {/* Social */}
               <section className="overflow-hidden rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
                 <h3 className="text-lg font-bold text-[#111d4a]">
-                  Follow TV SUPREME
+                  {t("Follow TV SUPREME")}
                 </h3>
 
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Stay connected with our latest stories and updates.
+                  {t("Stay connected with our latest stories and updates.")}
                 </p>
 
                 <div className="mt-5 flex flex-wrap gap-2">
                   <SocialButton
                     label="Facebook"
+                    ariaLabel={t("Follow TV SUPREME on Facebook")}
                     icon={<FacebookIcon />}
-                    href="#"
+                    href="https://www.facebook.com/tvsupremenews/"
                   />
 
                   <SocialButton
                     label="Instagram"
+                    ariaLabel={t("Follow TV SUPREME on Instagram")}
                     icon={<InstagramIcon />}
-                    href="#"
+                    href="https://www.instagram.com/tvsupremenews.lk/"
                   />
 
                   <SocialButton
                     label="YouTube"
+                    ariaLabel={t("Follow TV SUPREME on YouTube")}
                     icon={<YoutubeIcon />}
-                    href="#"
+                    href="https://www.youtube.com/@tvsupremenews"
                   />
 
-                  <SocialButton
-                    label="Website"
-                    icon={<Globe2 size={16} />}
-                    href="/en"
-                  />
+                  <Link
+                    href="/"
+                    aria-label={t("Visit the TV SUPREME website")}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-600 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600"
+                  >
+                    <Globe2 size={16} />
+                    {t("Website")}
+                  </Link>
                 </div>
               </section>
             </div>
@@ -320,38 +571,47 @@ export default function ContactPage() {
         <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <span className="text-sm font-bold uppercase tracking-[0.16em] text-pink-600">
-              Frequently Asked Questions
+              {t("Frequently Asked Questions")}
             </span>
 
             <h2 className="mt-3 text-3xl font-black text-[#111d4a] sm:text-4xl">
-              Frequently Asked Questions
+              {t("Frequently Asked Questions")}
             </h2>
 
             <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-500">
-              Here are some common questions about contacting TV
-              SUPREME.
+              {t(
+                "Here are some common questions about contacting TV SUPREME.",
+              )}
             </p>
           </div>
 
           <div className="mt-8 space-y-3">
             <FAQItem
-              question="How can I send a news tip?"
-              answer="Use the contact form above and provide the details of the story. Our newsroom team can review the information and follow up when appropriate."
+              question={t("How can I send a news tip?")}
+              answer={t(
+                "Use the contact form above and provide the details of the story. Our newsroom team can review the information and follow up when appropriate.",
+              )}
             />
 
             <FAQItem
-              question="How can I contact the advertising team?"
-              answer="Use the business enquiry channel or visit the Advertise page for information about advertising opportunities."
+              question={t("How can I contact the advertising team?")}
+              answer={t(
+                "Use the business enquiry channel or visit the Advertise page for information about advertising opportunities.",
+              )}
             />
 
             <FAQItem
-              question="Can I provide feedback about the website?"
-              answer="Yes. We welcome suggestions and feedback about the TV SUPREME website and digital experience."
+              question={t("Can I provide feedback about the website?")}
+              answer={t(
+                "Yes. We welcome suggestions and feedback about the TV SUPREME website and digital experience.",
+              )}
             />
 
             <FAQItem
-              question="Can I contact TV SUPREME for media enquiries?"
-              answer="Yes. Please use the contact form and select an appropriate subject so your request can be directed to the relevant team."
+              question={t("Can I contact TV SUPREME for media enquiries?")}
+              answer={t(
+                "Yes. Please use the contact form and select an appropriate subject so your request can be directed to the relevant team.",
+              )}
             />
           </div>
         </div>
@@ -369,12 +629,13 @@ export default function ContactPage() {
               </p>
 
               <h2 className="mt-3 text-2xl font-black text-white sm:text-3xl">
-                Have something important to share?
+                {t("Have something important to share?")}
               </h2>
 
               <p className="mt-3 text-sm leading-6 text-white/75">
-                Whether it&apos;s a story tip, feedback or a business
-                enquiry, we&apos;re ready to hear from you.
+                {t(
+                  "Whether it's a story tip, feedback or a business enquiry, we're ready to hear from you.",
+                )}
               </p>
 
               <div className="mt-6 flex flex-wrap gap-3">
@@ -383,14 +644,14 @@ export default function ContactPage() {
                   className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-[#3c2372] transition hover:bg-slate-100"
                 >
                   <Mail size={16} />
-                  Email Us
+                  {t("Email Us")}
                 </a>
 
                 <Link
-                  href="/en/latest"
+                  href="/latest"
                   className="inline-flex items-center rounded-xl border border-white/30 bg-white/10 px-5 py-3 text-sm font-bold text-white backdrop-blur transition hover:bg-white/20"
                 >
-                  Latest News
+                  {t("Latest News")}
                 </Link>
               </div>
             </div>
@@ -519,10 +780,12 @@ function ContactChannel({
 
 function SocialButton({
   label,
+  ariaLabel,
   icon,
   href,
 }: {
   label: string;
+  ariaLabel?: string;
   icon: ReactNode;
   href: string;
 }) {
@@ -530,7 +793,7 @@ function SocialButton({
     <a
       href={href}
       className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-600 transition hover:border-pink-200 hover:bg-pink-50 hover:text-pink-600"
-      aria-label={label}
+      aria-label={ariaLabel || label}
     >
       {icon}
       {label}

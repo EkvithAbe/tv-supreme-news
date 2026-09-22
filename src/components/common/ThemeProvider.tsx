@@ -156,22 +156,28 @@ export function ThemeProvider({
   ======================================================== */
 
   useEffect(() => {
-    if (isAdmin) {
-      setUserOverride(null);
-      setTheme("light");
-      return;
-    }
+    const syncTimer = window.setTimeout(() => {
+      if (isAdmin) {
+        setUserOverride(null);
+        setTheme("light");
+        return;
+      }
 
-    const saved =
-      localStorage.getItem(
-        USER_THEME_KEY
-      );
+      const saved =
+        localStorage.getItem(
+          USER_THEME_KEY
+        );
 
-    if (isTheme(saved)) {
-      setUserOverride(saved);
-    } else {
-      setUserOverride(null);
-    }
+      if (isTheme(saved)) {
+        setUserOverride(saved);
+      } else {
+        setUserOverride(null);
+      }
+    }, 0);
+
+    return () => {
+      window.clearTimeout(syncTimer);
+    };
   }, [isAdmin]);
 
   /* =======================================================
@@ -444,21 +450,27 @@ export function ThemeProvider({
   ======================================================== */
 
   useEffect(() => {
-    if (isAdmin) {
-      setTheme("light");
-      return;
-    }
+    const syncTimer = window.setTimeout(() => {
+      if (isAdmin) {
+        setTheme("light");
+        return;
+      }
 
-    if (userOverride) {
-      setTheme(userOverride);
-      return;
-    }
+      if (userOverride) {
+        setTheme(userOverride);
+        return;
+      }
 
-    setTheme(
-      resolveTheme(
-        siteThemeMode
-      )
-    );
+      setTheme(
+        resolveTheme(
+          siteThemeMode
+        )
+      );
+    }, 0);
+
+    return () => {
+      window.clearTimeout(syncTimer);
+    };
   }, [
     isAdmin,
     siteThemeMode,

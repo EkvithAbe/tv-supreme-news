@@ -3,6 +3,11 @@ import path from "node:path";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 
 import {
+  isAdmin,
+  requireAdminApiAccess,
+  requireContentApiAccess,
+} from "@/lib/auth";
+import {
   createMedia,
   deleteMedia,
   getMedia,
@@ -11,6 +16,16 @@ import {
 } from "@/lib/data/media";
 
 export const runtime = "nodejs";
+
+const EDITOR_IMAGE_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
+
+const EDITOR_IMAGE_MAX_BYTES =
+  10 * 1024 * 1024;
 
 function getMediaType(mimeType: string): MediaTypeValue {
   if (mimeType.startsWith("image/")) {
@@ -32,6 +47,64 @@ function safeFilename(filename: string): string {
   return filename.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
+function hasExpectedImageSignature(
+  bytes: Buffer,
+  mimeType: string,
+) {
+  if (mimeType === "image/jpeg") {
+    return (
+      bytes.length >= 3 &&
+      bytes[0] === 0xff &&
+      bytes[1] === 0xd8 &&
+      bytes[2] === 0xff
+    );
+  }
+
+  if (mimeType === "image/png") {
+    return (
+      bytes.length >= 8 &&
+      bytes.subarray(0, 8).equals(
+        Buffer.from([
+          0x89,
+          0x50,
+          0x4e,
+          0x47,
+          0x0d,
+          0x0a,
+          0x1a,
+          0x0a,
+        ]),
+      )
+    );
+  }
+
+  if (mimeType === "image/gif") {
+    return (
+      bytes.length >= 6 &&
+      (bytes.subarray(0, 6).equals(
+        Buffer.from("GIF87a"),
+      ) ||
+        bytes.subarray(0, 6).equals(
+          Buffer.from("GIF89a"),
+        ))
+    );
+  }
+
+  if (mimeType === "image/webp") {
+    return (
+      bytes.length >= 12 &&
+      bytes.subarray(0, 4).equals(
+        Buffer.from("RIFF"),
+      ) &&
+      bytes.subarray(8, 12).equals(
+        Buffer.from("WEBP"),
+      )
+    );
+  }
+
+  return false;
+}
+
 /**
  * GET /api/admin/media
  *
@@ -42,6 +115,13 @@ function safeFilename(filename: string): string {
  * ?pageSize=50
  */
 export async function GET(request: Request) {
+  const access =
+    await requireContentApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const { searchParams } = new URL(request.url);
 
@@ -68,11 +148,13 @@ export async function GET(request: Request) {
       "DOCUMENT",
     ];
 
-    const type = validTypes.includes(
-      typeParam as MediaTypeValue
-    )
-      ? (typeParam as MediaTypeValue)
-      : undefined;
+    const type = isAdmin(access.user)
+      ? validTypes.includes(
+          typeParam as MediaTypeValue,
+        )
+        ? (typeParam as MediaTypeValue)
+        : undefined
+      : "IMAGE";
 
     const result = await getMedia({
       search,
@@ -108,6 +190,13 @@ export async function GET(request: Request) {
  * altText
  */
 export async function POST(request: Request) {
+  const access =
+    await requireContentApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const formData = await request.formData();
 
@@ -140,6 +229,59 @@ export async function POST(request: Request) {
 
     const bytes = Buffer.from(await file.arrayBuffer());
 
+    if (!isAdmin(access.user)) {
+      if (
+        !EDITOR_IMAGE_MIME_TYPES.has(
+          file.type,
+        )
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Editors may upload JPEG, PNG, WebP or GIF images only.",
+          },
+          {
+            status: 403,
+          },
+        );
+      }
+
+      if (
+        file.size >
+        EDITOR_IMAGE_MAX_BYTES
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Images must be 10 MB or smaller.",
+          },
+          {
+            status: 400,
+          },
+        );
+      }
+
+      if (
+        !hasExpectedImageSignature(
+          bytes,
+          file.type,
+        )
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "The uploaded file is not a valid image.",
+          },
+          {
+            status: 400,
+          },
+        );
+      }
+    }
+
     const uploadDirectory = path.join(
       process.cwd(),
       "public",
@@ -168,7 +310,9 @@ export async function POST(request: Request) {
     const media = await createMedia({
       filename: file.name,
       url: publicUrl,
-      type: getMediaType(file.type),
+      type: isAdmin(access.user)
+        ? getMediaType(file.type)
+        : "IMAGE",
       mimeType: file.type || null,
       size: file.size,
       altText:
@@ -212,6 +356,13 @@ export async function POST(request: Request) {
  * }
  */
 export async function PUT(request: Request) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const body = await request.json();
 
@@ -276,6 +427,13 @@ export async function PUT(request: Request) {
  * DELETE /api/admin/media?id=MEDIA_ID
  */
 export async function DELETE(request: Request) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const { searchParams } = new URL(request.url);
 

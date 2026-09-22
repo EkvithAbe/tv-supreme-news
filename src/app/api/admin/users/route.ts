@@ -1,14 +1,65 @@
 import { NextResponse } from "next/server";
 
+import { requireAdminApiAccess } from "@/lib/auth";
 import {
   createUser,
   deleteUser,
+  getUserById,
   updateUser,
 } from "@/lib/data/users";
+import { getActivityForUser, recordActivity } from "@/lib/data/activity";
+
+export async function GET(request: Request) {
+  const access = await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Editor ID is required.",
+      },
+      { status: 400 },
+    );
+  }
+
+  const user = await getUserById(id);
+
+  if (!user || user.role !== "EDITOR") {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Editor not found.",
+      },
+      { status: 404 },
+    );
+  }
+
+  const activity = await getActivityForUser(id);
+
+  return NextResponse.json({
+    success: true,
+    user,
+    activity,
+  });
+}
 
 export async function POST(
   request: Request,
 ) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const body =
       await request.json();
@@ -18,10 +69,25 @@ export async function POST(
         name: body.name,
         email: body.email,
         password: body.password,
-        role:
-          body.role ??
-          "JOURNALIST",
+        role: "EDITOR",
       });
+
+    await recordActivity({
+      actorId: access.user.id,
+      action: "EDITOR_CREATED",
+      resourceType: "EDITOR",
+      resourceId: user.id,
+      summary: `Created Editor account for ${user.name}.`,
+      notifyUser: {
+        userId: user.id,
+        notification: {
+          kind: "EDITOR_ACCOUNT_CREATED",
+          title: "Your Editor account is ready",
+          message: "You can now sign in to the TV SUPREME CMS.",
+          href: "/admin/profile",
+        },
+      },
+    });
 
     return NextResponse.json(
       {
@@ -51,6 +117,13 @@ export async function POST(
 export async function PUT(
   request: Request,
 ) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const body =
       await request.json();
@@ -65,6 +138,17 @@ export async function PUT(
       );
     }
 
+    const existing = await getUserById(body.id);
+
+    if (!existing || existing.role !== "EDITOR") {
+      return NextResponse.json(
+        {
+          error: "Only Editor accounts can be managed here.",
+        },
+        { status: 404 },
+      );
+    }
+
     const user =
       await updateUser(
         body.id,
@@ -74,9 +158,33 @@ export async function PUT(
           password:
             body.password ||
             undefined,
-          role: body.role,
+          phone:
+            body.phone,
+          jobTitle:
+            body.jobTitle,
+          bio:
+            body.bio,
+          profileImageId:
+            body.profileImageId,
         },
       );
+
+    await recordActivity({
+      actorId: access.user.id,
+      action: "EDITOR_UPDATED",
+      resourceType: "EDITOR",
+      resourceId: user.id,
+      summary: `Updated Editor account for ${user.name}.`,
+      notifyUser: {
+        userId: user.id,
+        notification: {
+          kind: "EDITOR_ACCOUNT_UPDATED",
+          title: "Your Editor account was updated",
+          message: "An administrator updated your account details.",
+          href: "/admin/profile",
+        },
+      },
+    });
 
     return NextResponse.json({
       success: true,
@@ -103,6 +211,13 @@ export async function PUT(
 export async function DELETE(
   request: Request,
 ) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const { searchParams } =
       new URL(request.url);
@@ -120,7 +235,26 @@ export async function DELETE(
       );
     }
 
+    const existing = await getUserById(id);
+
+    if (!existing || existing.role !== "EDITOR") {
+      return NextResponse.json(
+        {
+          error: "Only Editor accounts can be managed here.",
+        },
+        { status: 404 },
+      );
+    }
+
     await deleteUser(id);
+
+    await recordActivity({
+      actorId: access.user.id,
+      action: "EDITOR_DELETED",
+      resourceType: "EDITOR",
+      resourceId: id,
+      summary: `Deleted Editor account for ${existing.name}.`,
+    });
 
     return NextResponse.json({
       success: true,

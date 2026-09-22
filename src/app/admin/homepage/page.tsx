@@ -932,7 +932,7 @@ export default function HomepagePage() {
         <div className="border-t border-slate-100 bg-slate-50/70 px-5 py-4">
           <p className="text-xs leading-5 text-slate-400">
             Homepage configuration is currently stored in local
-            UI state. It will later connect to your PostgreSQL
+            UI state. It will later connect to your MySQL
             database through the CMS API.
           </p>
         </div>

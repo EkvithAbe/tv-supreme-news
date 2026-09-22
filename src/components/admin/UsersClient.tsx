@@ -19,10 +19,7 @@ import {
 
 type UserRole =
   | "ADMIN"
-  | "EDITOR"
-  | "JOURNALIST"
-  | "VIDEO_EDITOR"
-  | "PHOTOGRAPHER";
+  | "EDITOR";
 
 type CmsUser = {
   id: string;
@@ -34,6 +31,12 @@ type CmsUser = {
   articleCount: number;
 };
 
+type EditorActivity = {
+  id: string;
+  summary: string;
+  createdAt: string | Date;
+};
+
 type RoleFilter =
   | "ALL"
   | UserRole;
@@ -42,13 +45,7 @@ type Props = {
   initialUsers: CmsUser[];
 };
 
-const roles: UserRole[] = [
-  "ADMIN",
-  "EDITOR",
-  "JOURNALIST",
-  "VIDEO_EDITOR",
-  "PHOTOGRAPHER",
-];
+const roles: UserRole[] = ["EDITOR"];
 
 const roleLabels: Record<
   UserRole,
@@ -56,9 +53,6 @@ const roleLabels: Record<
 > = {
   ADMIN: "Administrator",
   EDITOR: "Editor",
-  JOURNALIST: "Journalist",
-  VIDEO_EDITOR: "Video Editor",
-  PHOTOGRAPHER: "Photographer",
 };
 
 const roleFilters: {
@@ -76,18 +70,6 @@ const roleFilters: {
   {
     label: "Editors",
     value: "EDITOR",
-  },
-  {
-    label: "Journalists",
-    value: "JOURNALIST",
-  },
-  {
-    label: "Video Editors",
-    value: "VIDEO_EDITOR",
-  },
-  {
-    label: "Photographers",
-    value: "PHOTOGRAPHER",
   },
 ];
 
@@ -117,6 +99,28 @@ function formatDate(
   ).format(date);
 }
 
+function formatDateTime(
+  value: string | Date,
+) {
+  const date =
+    value instanceof Date
+      ? value
+      : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Colombo",
+  }).format(date);
+}
+
 function getInitials(
   name: string,
 ) {
@@ -140,16 +144,7 @@ function getRoleDescription(
       return "Full access to manage users, articles, media and CMS settings.";
 
     case "EDITOR":
-      return "Can create, edit and review newsroom content.";
-
-    case "JOURNALIST":
-      return "Can create articles and submit newsroom content for review.";
-
-    case "VIDEO_EDITOR":
-      return "Manages video content and video-related newsroom work.";
-
-    case "PHOTOGRAPHER":
-      return "Manages photography and media content for newsroom stories.";
+      return "Can create, edit, publish and delete articles and videos, and select or upload images for them.";
 
     default:
       return "CMS permissions are assigned according to the selected role.";
@@ -185,8 +180,12 @@ export default function UsersClient({
 
   const [selectedUser, setSelectedUser] =
     useState<CmsUser | null>(
-      null,
-    );
+    null,
+  );
+  const [selectedActivity, setSelectedActivity] =
+    useState<EditorActivity[]>([]);
+  const [isLoadingActivity, setIsLoadingActivity] =
+    useState(false);
 
   const [name, setName] =
     useState("");
@@ -196,7 +195,7 @@ export default function UsersClient({
 
   const [role, setRole] =
     useState<UserRole>(
-      "JOURNALIST",
+      "EDITOR",
     );
 
   const [password, setPassword] =
@@ -233,22 +232,6 @@ export default function UsersClient({
     users.filter(
       (user) =>
         user.role === "EDITOR",
-    ).length;
-
-  const journalists =
-    users.filter(
-      (user) =>
-        user.role ===
-        "JOURNALIST",
-    ).length;
-
-  const contentTeam =
-    users.filter(
-      (user) =>
-        user.role ===
-          "VIDEO_EDITOR" ||
-        user.role ===
-          "PHOTOGRAPHER",
     ).length;
 
   /* =========================================================
@@ -310,7 +293,7 @@ export default function UsersClient({
   const resetForm = () => {
     setName("");
     setEmail("");
-    setRole("JOURNALIST");
+    setRole("EDITOR");
     setPassword("");
     setEditingUser(null);
     setError("");
@@ -340,6 +323,45 @@ export default function UsersClient({
     setPassword("");
     setError("");
     setShowModal(true);
+  };
+
+  const openUserDetails = async (
+    user: CmsUser,
+  ) => {
+    setSelectedUser(user);
+    setSelectedActivity([]);
+
+    if (user.role !== "EDITOR") {
+      return;
+    }
+
+    setIsLoadingActivity(true);
+
+    try {
+      const response = await fetch(
+        `/api/admin/users?id=${encodeURIComponent(user.id)}`,
+        { cache: "no-store" },
+      );
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "Unable to load Editor activity.");
+      }
+
+      setSelectedActivity(
+        Array.isArray(data.activity)
+          ? data.activity
+          : [],
+      );
+    } catch (activityError) {
+      setError(
+        activityError instanceof Error
+          ? activityError.message
+          : "Unable to load Editor activity.",
+      );
+    } finally {
+      setIsLoadingActivity(false);
+    }
   };
 
   /* =========================================================
@@ -435,8 +457,6 @@ export default function UsersClient({
               email:
                 cleanEmail,
 
-              role,
-
               ...(password
                 ? {
                     password,
@@ -475,9 +495,7 @@ export default function UsersClient({
           selectedUser?.id ===
           savedUser.id
         ) {
-          setSelectedUser(
-            savedUser,
-          );
+            setSelectedUser(savedUser);
         }
 
         setSuccess(
@@ -609,9 +627,7 @@ export default function UsersClient({
           </h1>
 
           <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
-            Manage the people who can access
-            and contribute to the TV SUPREME
-            CMS.
+            Create and manage Editor accounts. The administrator account is protected.
           </p>
         </div>
 
@@ -625,7 +641,7 @@ export default function UsersClient({
           <UserPlus
             size={17}
           />
-          Add User
+          Add Editor
         </button>
       </div>
 
@@ -716,12 +732,9 @@ export default function UsersClient({
         />
 
         <UserStatCard
-          title="Newsroom"
-          value={String(
-            journalists +
-              contentTeam,
-          )}
-          note={`${journalists} journalists · ${contentTeam} media staff`}
+          title="Content team"
+          value={String(editors)}
+          note="Article and video management"
           icon={
             <UserPlus
               size={20}
@@ -892,9 +905,7 @@ export default function UsersClient({
                         <button
                           type="button"
                           onClick={() =>
-                            setSelectedUser(
-                              user,
-                            )
+                            void openUserDetails(user)
                           }
                           className="flex min-w-0 items-center gap-3 text-left"
                         >
@@ -960,9 +971,7 @@ export default function UsersClient({
                           <button
                             type="button"
                             onClick={() =>
-                              setSelectedUser(
-                                user,
-                              )
+                              void openUserDetails(user)
                             }
                             className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                             aria-label={`View ${user.name}`}
@@ -972,6 +981,8 @@ export default function UsersClient({
                             />
                           </button>
 
+                          {user.role === "EDITOR" && (
+                            <>
                           <button
                             type="button"
                             onClick={() =>
@@ -1005,6 +1016,8 @@ export default function UsersClient({
                               size={15}
                             />
                           </button>
+                            </>
+                          )}
 
                           <button
                             type="button"
@@ -1081,7 +1094,7 @@ export default function UsersClient({
 
               <p className="mt-1 text-sm leading-6 text-slate-500">
                 Roles are based on the
-                PostgreSQL UserRole enum used
+                MySQL UserRole enum used
                 by the TV SUPREME CMS.
               </p>
             </div>
@@ -1119,7 +1132,7 @@ export default function UsersClient({
           <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
             <div className="min-w-0">
               <p className="text-sm font-medium text-pink-600">
-                User Details
+                {selectedUser.role === "EDITOR" ? "Editor Details" : "Administrator Details"}
               </p>
 
               <h2 className="mt-1 truncate text-lg font-semibold text-slate-900">
@@ -1129,7 +1142,7 @@ export default function UsersClient({
               </h2>
 
               <p className="mt-1 text-sm text-slate-500">
-                Database user record
+                {selectedUser.role === "EDITOR" ? "Editor account and activity" : "Administrator account"}
               </p>
             </div>
 
@@ -1203,6 +1216,28 @@ export default function UsersClient({
                   )}
                 />
               </div>
+
+              {selectedUser.role === "EDITOR" && (
+                <div className="mt-6">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                    Editor activity
+                  </p>
+                  <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
+                    {isLoadingActivity ? (
+                      <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">Loading activity...</p>
+                    ) : selectedActivity.length ? (
+                      selectedActivity.map((activity) => (
+                        <div key={activity.id} className="rounded-xl bg-slate-50 p-3">
+                          <p className="text-sm font-medium text-slate-700">{activity.summary}</p>
+                          <p className="mt-1 text-xs text-slate-500">{formatDateTime(activity.createdAt)}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">No Editor activity yet.</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
@@ -1210,7 +1245,7 @@ export default function UsersClient({
                 Account Actions
               </p>
 
-              <div className="mt-4 space-y-2">
+              {selectedUser.role === "EDITOR" && <div className="mt-4 space-y-2">
                 <button
                   type="button"
                   onClick={() =>
@@ -1234,10 +1269,8 @@ export default function UsersClient({
                     )
                   }
                   disabled={
-                    selectedUser.role ===
-                      "ADMIN" ||
                     deletingId ===
-                      selectedUser.id
+                    selectedUser.id
                   }
                   className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-red-600 shadow-sm ring-1 ring-slate-200 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
                 >
@@ -1247,6 +1280,7 @@ export default function UsersClient({
                   Delete User
                 </button>
               </div>
+              }
             </div>
           </div>
         </section>
@@ -1351,52 +1385,19 @@ export default function UsersClient({
 
                 {/* ROLE */}
                 <div>
-                  <label
-                    htmlFor="userRole"
-                    className="mb-2 block text-sm font-semibold text-slate-700"
-                  >
+                  <p className="mb-2 text-sm font-semibold text-slate-700">
                     CMS Role
-                  </label>
+                  </p>
 
-                  <div className="relative">
-                    <select
-                      id="userRole"
-                      value={role}
-                      onChange={(
-                        event,
-                      ) =>
-                        setRole(
-                          event.target
-                            .value as UserRole,
-                        )
-                      }
-                      className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 outline-none transition focus:border-pink-400"
-                    >
-                      {roles.map(
-                        (roleItem) => (
-                          <option
-                            key={
-                              roleItem
-                            }
-                            value={
-                              roleItem
-                            }
-                          >
-                            {
-                              roleLabels[
-                                roleItem
-                              ]
-                            }
-                          </option>
-                        ),
-                      )}
-                    </select>
+                  <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
+                    {roleLabels[role]}
+                  </p>
 
-                    <ChevronDown
-                      size={16}
-                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
-                    />
-                  </div>
+                  {!editingUser && (
+                    <p className="mt-2 text-xs leading-5 text-slate-500">
+                      New CMS accounts are registered as Editors. The existing administrator account is protected.
+                    </p>
+                  )}
                 </div>
 
                 {/* PASSWORD */}
@@ -1597,12 +1598,6 @@ function RoleBadge({
       "bg-pink-50 text-pink-700",
     EDITOR:
       "bg-purple-50 text-purple-700",
-    JOURNALIST:
-      "bg-blue-50 text-blue-700",
-    VIDEO_EDITOR:
-      "bg-amber-50 text-amber-700",
-    PHOTOGRAPHER:
-      "bg-emerald-50 text-emerald-700",
   };
 
   return (

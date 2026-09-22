@@ -73,6 +73,11 @@ type ArticleStatus =
 type Props = {
   initialCategories: CategoryOption[];
   initialAuthors: AuthorOption[];
+  currentUser: {
+    id: string;
+    name: string;
+    role: "ADMIN" | "EDITOR";
+  };
 };
 
 const languageLabels: Record<
@@ -130,6 +135,7 @@ function formatFileSize(bytes: number | null | undefined) {
 export default function NewArticleClient({
   initialCategories,
   initialAuthors,
+  currentUser,
 }: Props) {
   const [activeLanguage, setActiveLanguage] =
     useState<Language>("EN");
@@ -147,17 +153,17 @@ export default function NewArticleClient({
    * Do not automatically choose the first category.
    *
    * The editor must explicitly select a category
-   * from the categories stored in PostgreSQL.
+   * from the categories stored in MySQL.
    */
   const [categoryId, setCategoryId] =
     useState("");
 
-  /*
-   * Do not automatically choose an author.
-   * The editor must explicitly select one.
-   */
   const [authorId, setAuthorId] =
-    useState("");
+    useState(
+      currentUser.role === "EDITOR"
+        ? currentUser.id
+        : "",
+    );
 
   const [tags, setTags] =
     useState<string[]>([]);
@@ -946,7 +952,10 @@ export default function NewArticleClient({
     /*
      * Author is required.
      */
-    if (!authorId) {
+    if (
+      currentUser.role === "ADMIN" &&
+      !authorId
+    ) {
       setError(
         "Please select an author.",
       );
@@ -983,7 +992,7 @@ export default function NewArticleClient({
     /*
      * Make sure the selected category
      * actually exists in the data received
-     * from PostgreSQL.
+     * from MySQL.
      */
     const selectedCategory =
       initialCategories.find(
@@ -1003,18 +1012,19 @@ export default function NewArticleClient({
      * Make sure the selected author
      * still exists in the loaded author list.
      */
-    const selectedAuthor =
-      initialAuthors.find(
-        (author) =>
-          author.id ===
-          authorId,
+    if (currentUser.role === "ADMIN") {
+      const selectedAuthor =
+        initialAuthors.find(
+          (author) =>
+            author.id === authorId,
       );
 
-    if (!selectedAuthor) {
-      setError(
-        "The selected author is no longer available. Please refresh the page and select an author again.",
-      );
-      return;
+      if (!selectedAuthor) {
+        setError(
+          "The selected author is no longer available. Please refresh the page and select an author again.",
+        );
+        return;
+      }
     }
 
     /*
@@ -1593,64 +1603,65 @@ export default function NewArticleClient({
 
               <div className="space-y-5 p-5">
                 {/* AUTHOR */}
-                <div>
-                  <label
-                    htmlFor="author"
-                    className="mb-2 block text-sm font-semibold text-slate-700"
-                  >
-                    Author
-                  </label>
-
-                  <div className="relative">
-                    <select
-                      id="author"
-                      value={authorId}
-                      onChange={(
-                        event,
-                      ) =>
-                        setAuthorId(
-                          event.target
-                            .value,
-                        )
-                      }
-                      className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 outline-none focus:border-pink-400"
+                {currentUser.role === "ADMIN" ? (
+                  <div>
+                    <label
+                      htmlFor="author"
+                      className="mb-2 block text-sm font-semibold text-slate-700"
                     >
-                      <option value="">
-                        Select author
-                      </option>
+                      Author
+                    </label>
 
-                      {initialAuthors.map(
-                        (author) => (
-                          <option
-                            key={
-                              author.id
-                            }
-                            value={
-                              author.id
-                            }
-                          >
-                            {author.name} —{" "}
-                            {author.role}
-                          </option>
-                        ),
-                      )}
-                    </select>
+                    <div className="relative">
+                      <select
+                        id="author"
+                        value={authorId}
+                        onChange={(event) =>
+                          setAuthorId(
+                            event.target.value,
+                          )
+                        }
+                        className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 outline-none focus:border-pink-400"
+                      >
+                        <option value="">
+                          Select author
+                        </option>
 
-                    <ChevronDown
-                      size={16}
-                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
-                    />
+                        {initialAuthors.map(
+                          (author) => (
+                            <option
+                              key={author.id}
+                              value={author.id}
+                            >
+                              {author.name} — {author.role}
+                            </option>
+                          ),
+                        )}
+                      </select>
+
+                      <ChevronDown
+                        size={16}
+                        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+                      />
+                    </div>
+
+                    {initialAuthors.length === 0 && (
+                      <p className="mt-2 text-xs text-amber-600">
+                        No CMS authors are available.
+                        Create an Admin or Editor first.
+                      </p>
+                    )}
                   </div>
-
-                  {initialAuthors.length ===
-                    0 && (
-                    <p className="mt-2 text-xs text-amber-600">
-                      No CMS authors are available.
-                      Create an Admin, Editor or
-                      Journalist user first.
+                ) : (
+                  <div>
+                    <p className="mb-2 text-sm font-semibold text-slate-700">
+                      Author
                     </p>
-                  )}
-                </div>
+                    <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                      {currentUser.name}
+                    </p>
+                  </div>
+                )}
 
                 {/* PUBLISH DATE */}
                 <div>
@@ -1747,7 +1758,7 @@ export default function NewArticleClient({
 
                 <p className="mt-1 text-sm leading-6 text-slate-500">
                   Choose a category from
-                  PostgreSQL.
+                  MySQL.
                 </p>
               </div>
 
@@ -2412,51 +2423,33 @@ export default function NewArticleClient({
               </div>
 
               <div className="space-y-4 p-5">
-                <ToggleRow
-                  label="Breaking News"
-                  description="Mark this as a priority breaking story."
-                  checked={
-                    breakingNews
-                  }
-                  onChange={
-                    setBreakingNews
-                  }
-                  icon={
-                    <Zap size={17} />
-                  }
-                />
-
-                <ToggleRow
-                  label="Featured"
-                  description="Highlight this article in featured areas."
-                  checked={
-                    featured
-                  }
-                  onChange={
-                    setFeatured
-                  }
-                  icon={
-                    <FileText
-                      size={17}
+                {currentUser.role === "ADMIN" && (
+                  <>
+                    <ToggleRow
+                      label="Breaking News"
+                      description="Mark this as a priority breaking story."
+                      checked={breakingNews}
+                      onChange={setBreakingNews}
+                      icon={<Zap size={17} />}
                     />
-                  }
-                />
 
-                <ToggleRow
-                  label="Show on Homepage"
-                  description="Allow this article to appear in homepage sections."
-                  checked={
-                    showOnHomepage
-                  }
-                  onChange={
-                    setShowOnHomepage
-                  }
-                  icon={
-                    <ImageIcon
-                      size={17}
+                    <ToggleRow
+                      label="Featured"
+                      description="Highlight this article in featured areas."
+                      checked={featured}
+                      onChange={setFeatured}
+                      icon={<FileText size={17} />}
                     />
-                  }
-                />
+
+                    <ToggleRow
+                      label="Show on Homepage"
+                      description="Allow this article to appear in homepage sections."
+                      checked={showOnHomepage}
+                      onChange={setShowOnHomepage}
+                      icon={<ImageIcon size={17} />}
+                    />
+                  </>
+                )}
 
                 <ToggleRow
                   label="Show in Latest"

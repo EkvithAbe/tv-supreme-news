@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import MediaImagePicker, {
+  type SelectedImage,
+} from "@/components/admin/MediaImagePicker";
+import { useAdminUser } from "@/components/admin/AdminUserContext";
 
 import {
   CalendarClock,
@@ -36,12 +40,6 @@ type CategoryOption = {
   id: string;
   name: string;
   slug?: string;
-};
-
-type ThumbnailOption = {
-  id: string;
-  name: string;
-  url: string;
 };
 
 type VideoItem = {
@@ -473,14 +471,13 @@ function parseApiVideos(
 }
 
 export default function VideosPage() {
+  const currentUser = useAdminUser();
+
   const [videos, setVideos] =
     useState<VideoItem[]>([]);
 
   const [videoCategories, setVideoCategories] =
     useState<CategoryOption[]>([]);
-
-  const [thumbnails, setThumbnails] =
-    useState<ThumbnailOption[]>([]);
 
   const [search, setSearch] =
     useState("");
@@ -525,8 +522,8 @@ export default function VideosPage() {
   const [videoUrl, setVideoUrl] =
     useState("");
 
-  const [thumbnailId, setThumbnailId] =
-    useState("");
+  const [thumbnail, setThumbnail] =
+    useState<SelectedImage | null>(null);
 
   const [featured, setFeatured] =
     useState(false);
@@ -554,7 +551,6 @@ export default function VideosPage() {
       const [
         videosResponse,
         videoCategoriesResponse,
-        mediaResponse,
       ] = await Promise.all([
         fetch(
           "/api/admin/videos?page=1&pageSize=100",
@@ -568,22 +564,14 @@ export default function VideosPage() {
             cache: "no-store",
           },
         ),
-        fetch(
-          "/api/admin/media?type=IMAGE&page=1&pageSize=100",
-          {
-            cache: "no-store",
-          },
-        ),
       ]);
 
       const [
         videosData,
         videoCategoriesData,
-        mediaData,
       ] = await Promise.all([
         videosResponse.json(),
         videoCategoriesResponse.json(),
-        mediaResponse.json(),
       ]);
 
       if (
@@ -678,80 +666,6 @@ export default function VideosPage() {
         setVideoCategories([]);
       }
 
-      if (
-        mediaResponse.ok &&
-        mediaData.success
-      ) {
-        const mediaItems =
-          Array.isArray(
-            mediaData.items,
-          )
-            ? mediaData.items
-            : [];
-
-        setThumbnails(
-          mediaItems
-            .filter(
-              (
-                item: unknown,
-              ): item is Record<
-                string,
-                unknown
-              > =>
-                Boolean(item) &&
-                typeof item ===
-                  "object" &&
-                String(
-                  (
-                    item as Record<
-                      string,
-                      unknown
-                    >
-                  ).type ?? "",
-                ) === "IMAGE" &&
-                Boolean(
-                  (
-                    item as Record<
-                      string,
-                      unknown
-                    >
-                  ).url,
-                ),
-            )
-            .map(
-              (
-                item: Record<
-                  string,
-                  unknown
-                >,
-              ) => ({
-                id: String(
-                  item.id ?? "",
-                ),
-                name: String(
-                  item.filename ??
-                    "Image",
-                ),
-                url: String(
-                  item.url ?? "",
-                ),
-              }),
-            )
-            .filter(
-              (
-                item: ThumbnailOption,
-              ) =>
-                Boolean(
-                  item.id,
-                ) &&
-                Boolean(
-                  item.url,
-                ),
-            ),
-        );
-      } else {
-        setThumbnails([]);
-      }
     } catch (loadError) {
       console.error(
         "Failed to load video data:",
@@ -769,7 +683,13 @@ export default function VideosPage() {
   };
 
   useEffect(() => {
-    void loadData();
+    const loadTimer = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(loadTimer);
+    };
   }, []);
 
   const videoCategoryNames = useMemo(
@@ -911,7 +831,7 @@ export default function VideosPage() {
     setLanguage("English");
     setDuration("");
     setVideoUrl("");
-    setThumbnailId("");
+    setThumbnail(null);
     setFeatured(false);
     setStatus("Draft");
     setScheduledAt("");
@@ -939,8 +859,15 @@ export default function VideosPage() {
     setLanguage(video.language);
     setDuration(video.duration);
     setVideoUrl(video.videoUrl);
-    setThumbnailId(
-      video.thumbnailId || "",
+    setThumbnail(
+      video.thumbnailId
+        ? {
+            id: video.thumbnailId,
+            filename: "Current thumbnail",
+            url: video.thumbnail,
+            altText: null,
+          }
+        : null,
     );
     setFeatured(video.featured);
     setStatus(video.status);
@@ -1040,7 +967,7 @@ export default function VideosPage() {
         videoCategoryId:
           videoCategoryId || null,
         thumbnailId:
-          thumbnailId || null,
+          thumbnail?.id ?? null,
         videoUrl:
           cleanVideoUrl,
         duration:
@@ -1859,7 +1786,7 @@ export default function VideosPage() {
 
           <span>
             Video records are stored in
-            PostgreSQL.
+            MySQL.
           </span>
         </div>
       </section>
@@ -2337,164 +2264,51 @@ export default function VideosPage() {
                 />
               </div>
 
-              {/* Thumbnail */}
-            {/* Thumbnail */}
-<div>
-  <label className="mb-2 block text-sm font-semibold text-slate-700">
-    Thumbnail
-  </label>
-
-  {/* Currently selected thumbnail */}
-  {thumbnailId && (
-    <div className="mb-3 flex items-center gap-3 rounded-2xl border border-pink-200 bg-pink-50 p-3">
-      <div className="relative h-20 w-32 shrink-0 overflow-hidden rounded-xl bg-slate-100">
-        {(() => {
-          const selectedThumbnail =
-            thumbnails.find(
-              (item: ThumbnailOption) =>
-                item.id === thumbnailId,
-            );
-
-          return selectedThumbnail ? (
-            <img
-              src={selectedThumbnail.url}
-              alt={selectedThumbnail.name}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">
-              Thumbnail
-            </div>
-          );
-        })()}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-semibold uppercase tracking-wide text-pink-600">
-          Selected Thumbnail
-        </p>
-
-        <p className="mt-1 truncate text-sm font-medium text-slate-700">
-          {thumbnails.find(
-            (item: ThumbnailOption) =>
-              item.id === thumbnailId,
-          )?.name || "Selected image"}
-        </p>
-
-        <button
-          type="button"
-          onClick={() => setThumbnailId("")}
-          className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50"
-        >
-          <X size={13} />
-          Remove Thumbnail
-        </button>
-      </div>
-    </div>
-  )}
-
-  {thumbnails.length > 0 ? (
-    <>
-      <div className="grid max-h-[250px] grid-cols-3 gap-3 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-4">
-        {thumbnails.map(
-          (
-            item: ThumbnailOption,
-          ) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() =>
-                setThumbnailId(item.id)
-              }
-              className={`relative aspect-video overflow-hidden rounded-xl border-2 transition ${
-                thumbnailId === item.id
-                  ? "border-pink-500 ring-2 ring-pink-100"
-                  : "border-transparent hover:border-pink-200"
-              }`}
-              title={item.name}
-            >
-              <img
-                src={item.url}
-                alt={item.name}
-                className="h-full w-full object-cover"
+              <MediaImagePicker
+                label="Video thumbnail"
+                value={thumbnail}
+                onChange={setThumbnail}
+                disabled={isSaving}
               />
 
-              {thumbnailId === item.id && (
-                <div className="absolute inset-0 flex items-center justify-center bg-pink-600/20">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-600 text-white">
-                    ✓
-                  </span>
+              {currentUser.role === "ADMIN" && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">
+                        Featured Video
+                      </p>
+
+                      <p className="mt-1 text-xs leading-5 text-slate-400">
+                        Highlight this video in the public Featured Videos section.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={featured}
+                      aria-label="Featured Video"
+                      onClick={() =>
+                        setFeatured(!featured)
+                      }
+                      className={`relative h-6 w-11 shrink-0 rounded-full transition ${
+                        featured
+                          ? "bg-gradient-to-r from-pink-600 to-purple-600"
+                          : "bg-slate-200"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition ${
+                          featured
+                            ? "left-[22px]"
+                            : "left-0.5"
+                        }`}
+                      />
+                    </button>
+                  </div>
                 </div>
               )}
-            </button>
-          ),
-        )}
-      </div>
-
-      <p className="mt-2 text-xs text-slate-400">
-        Select an image from the Media Library.
-        You can remove the selected thumbnail at any time.
-      </p>
-    </>
-  ) : (
-    <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-6 text-center">
-      <FileVideo
-        size={26}
-        className="mx-auto text-slate-300"
-      />
-
-      <p className="mt-2 text-sm font-semibold text-slate-600">
-        No image media available
-      </p>
-
-      <p className="mt-1 text-xs text-slate-400">
-        Upload an image in Media Library first.
-      </p>
-    </div>
-  )}
-</div>
-
-              {/* Featured */}
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">
-                      Featured Video
-                    </p>
-
-                    <p className="mt-1 text-xs leading-5 text-slate-400">
-                      Highlight this video in the
-                      public Featured Videos section.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={
-                      featured
-                    }
-                    onClick={() =>
-                      setFeatured(
-                        !featured,
-                      )
-                    }
-                    className={`relative h-6 w-11 shrink-0 rounded-full transition ${
-                      featured
-                        ? "bg-gradient-to-r from-pink-600 to-purple-600"
-                        : "bg-slate-200"
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition ${
-                        featured
-                          ? "left-[22px]"
-                          : "left-0.5"
-                      }`}
-                    />
-                  </button>
-                </div>
-              </div>
             </div>
 
             {/* Footer */}

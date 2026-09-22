@@ -14,6 +14,10 @@ import {
 } from "react";
 
 import { Link } from "@/i18n/navigation";
+import {
+  getStaticTranslator,
+  type StaticPageTranslations,
+} from "@/lib/static-page-translations";
 import { usePathname } from "next/navigation";
 
 /* =========================================================
@@ -97,6 +101,41 @@ const fallbackFooter: FooterData = {
   },
 
   links: [],
+};
+
+const footerTranslations: StaticPageTranslations = {
+  si: {
+    "NEWS • PEOPLE • A BRIGHTER TOMORROW": "ප්‍රවෘත්ති • ජනතාව • වඩාත් දීප්තිමත් හෙටක්",
+    "Your trusted source for Sri Lankan and world news.": "ශ්‍රී ලංකාවේ සහ ලෝකයේ පුවත් සඳහා ඔබගේ විශ්වාසනීය මූලාශ්‍රය.",
+    "About Us": "අප ගැන",
+    "Contact Us": "අප සමඟ සම්බන්ධ වන්න",
+    Advertise: "දැන්වීම් පළ කරන්න",
+    "Privacy Policy": "පෞද්ගලිකත්ව ප්‍රතිපත්තිය",
+    "Terms of Use": "භාවිත කොන්දේසි",
+    "Loading...": "පූරණය වෙමින්...",
+    "Follow Us": "අප අනුගමනය කරන්න",
+    "Footer navigation": "පාදක සැරිසැරුම",
+    "TV Supreme Home": "TV SUPREME මුල් පිටුව",
+    "Designed for a More Informed Sri Lanka": "වඩාත් දැනුවත් ශ්‍රී ලංකාවක් සඳහා නිර්මාණය කරන ලදී",
+    "Back to top": "ඉහළට යන්න",
+    "All Rights Reserved.": "සියලු හිමිකම් ඇවිරිණි.",
+  },
+  ta: {
+    "NEWS • PEOPLE • A BRIGHTER TOMORROW": "செய்திகள் • மக்கள் • பிரகாசமான நாளை",
+    "Your trusted source for Sri Lankan and world news.": "இலங்கை மற்றும் உலகச் செய்திகளுக்கான உங்கள் நம்பகமான ஆதாரம்.",
+    "About Us": "எங்களைப் பற்றி",
+    "Contact Us": "எங்களைத் தொடர்புகொள்ளுங்கள்",
+    Advertise: "விளம்பரப்படுத்துங்கள்",
+    "Privacy Policy": "தனியுரிமைக் கொள்கை",
+    "Terms of Use": "பயன்பாட்டு விதிமுறைகள்",
+    "Loading...": "ஏற்றப்படுகிறது...",
+    "Follow Us": "எங்களைப் பின்தொடருங்கள்",
+    "Footer navigation": "அடிப்பக வழிசெலுத்தல்",
+    "TV Supreme Home": "TV SUPREME முகப்பு",
+    "Designed for a More Informed Sri Lanka": "மேலும் தகவலறிந்த இலங்கைக்காக வடிவமைக்கப்பட்டது",
+    "Back to top": "மேலே செல்லவும்",
+    "All Rights Reserved.": "அனைத்து உரிமைகளும் பாதுகாக்கப்பட்டவை.",
+  },
 };
 
 /* =========================================================
@@ -303,6 +342,11 @@ export default function Footer() {
       locale,
     );
 
+  const staticText = getStaticTranslator(
+    locale,
+    footerTranslations,
+  );
+
   /* =======================================================
      STATE
   ======================================================== */
@@ -488,16 +532,6 @@ export default function Footer() {
   }, [language]);
 
   /* =======================================================
-     YEAR
-  ======================================================== */
-
-  useEffect(() => {
-    setCurrentYear(
-      new Date().getFullYear(),
-    );
-  }, []);
-
-  /* =======================================================
      SOCIAL LINKS
   ======================================================== */
 
@@ -657,7 +691,7 @@ export default function Footer() {
 
             <Link
               href="/"
-              aria-label="TV Supreme Home"
+              aria-label={staticText("TV Supreme Home")}
               className="
                 shrink-0
                 transition-opacity
@@ -721,9 +755,7 @@ export default function Footer() {
                     xl:text-[15px]
                   "
                 >
-                  {
-                    footer.tagline
-                  }
+                  {staticText(footer.tagline)}
                 </p>
               )}
 
@@ -736,7 +768,7 @@ export default function Footer() {
           ================================================== */}
 
           <nav
-            aria-label="Footer navigation"
+            aria-label={staticText("Footer navigation")}
             className="
               flex
               min-w-0
@@ -752,7 +784,7 @@ export default function Footer() {
 
             {isLoading ? (
               <span className="text-sm text-slate-400">
-                Loading...
+                {staticText("Loading...")}
               </span>
             ) : (
               visibleLinks.map(
@@ -801,7 +833,7 @@ export default function Footer() {
                           dark:hover:text-[#ec008c]
                         "
                       >
-                        {link.label}
+                        {staticText(link.label)}
                       </a>
 
                       {index <
@@ -854,7 +886,7 @@ export default function Footer() {
                   dark:text-white
                 "
               >
-                Follow Us
+                {staticText("Follow Us")}
               </span>
             )}
 
@@ -1088,8 +1120,12 @@ export default function Footer() {
               lg:text-[15px]
             "
           >
-            {footer.copyrightText ||
-              `© ${currentYear} TV SUPREME. All Rights Reserved.`}
+            {footer.copyrightText
+              ? footer.copyrightText.replace(
+                  /All Rights Reserved\.?$/i,
+                  staticText("All Rights Reserved."),
+                )
+              : `© ${currentYear} TV SUPREME. ${staticText("All Rights Reserved.")}`}
           </p>
 
           {/* CENTER MESSAGE */}
@@ -1103,8 +1139,9 @@ export default function Footer() {
               lg:text-[15px]
             "
           >
-            Designed for a More
-            Informed Sri Lanka
+            {staticText(
+              "Designed for a More Informed Sri Lanka",
+            )}
           </p>
 
           {/* LEGAL */}
@@ -1144,7 +1181,7 @@ export default function Footer() {
                     dark:hover:text-[#ec008c]
                   "
                 >
-                  {link.label}
+                  {staticText(link.label)}
                 </a>
               ))}
 
@@ -1185,7 +1222,7 @@ export default function Footer() {
                     dark:hover:text-[#ec008c]
                   "
                 >
-                  {link.label}
+                  {staticText(link.label)}
                 </a>
               ))}
 
@@ -1204,8 +1241,8 @@ export default function Footer() {
         onClick={
           scrollToTop
         }
-        aria-label="Back to top"
-        title="Back to top"
+        aria-label={staticText("Back to top")}
+        title={staticText("Back to top")}
         className="
           fixed
           bottom-5

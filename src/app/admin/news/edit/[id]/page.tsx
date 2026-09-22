@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import EditArticleClient from "@/components/admin/EditArticleClient";
+import { requireCmsUserPage } from "@/lib/auth";
 import { getArticleById } from "@/lib/data/articles";
 import { getArticleAuthors } from "@/lib/data/articles";
 import { getCategories } from "@/lib/data/categories";
@@ -14,13 +15,16 @@ type Props = {
 export default async function EditArticlePage({
   params,
 }: Props) {
+  const user = await requireCmsUserPage();
   const { id } = await params;
 
   const [article, categories, authors] =
     await Promise.all([
       getArticleById(id, "EN"),
       getCategories("EN"),
-      getArticleAuthors(),
+      user.role === "ADMIN"
+        ? getArticleAuthors()
+        : Promise.resolve([]),
     ]);
 
   if (!article) {
@@ -40,6 +44,11 @@ export default async function EditArticlePage({
       article={article}
       initialCategories={categoryOptions}
       initialAuthors={authors}
+      currentUser={{
+        id: user.id,
+        name: user.name,
+        role: user.role,
+      }}
     />
   );
 }

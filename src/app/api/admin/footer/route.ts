@@ -2,6 +2,7 @@
 
 import { NextResponse } from "next/server";
 
+import { requireAdminApiAccess } from "@/lib/auth";
 import {
   createFooterLink,
   deleteFooterLink,
@@ -291,6 +292,13 @@ function parseSaveInput(
 export async function GET(
   request: Request,
 ) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const url =
       new URL(
@@ -359,6 +367,13 @@ export async function GET(
 export async function POST(
   request: Request,
 ) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const body =
       await request.json();
@@ -486,6 +501,13 @@ export async function POST(
 export async function PUT(
   request: Request,
 ) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const body =
       await request.json();
@@ -558,6 +580,13 @@ export async function PUT(
 export async function PATCH(
   request: Request,
 ) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const body =
       await request.json();
@@ -818,6 +847,13 @@ export async function PATCH(
 export async function DELETE(
   request: Request,
 ) {
+  const access =
+    await requireAdminApiAccess();
+
+  if (access.response) {
+    return access.response;
+  }
+
   try {
     const url =
       new URL(

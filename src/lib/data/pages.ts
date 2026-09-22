@@ -276,6 +276,22 @@ export async function createPage(
     );
   }
 
+  const existingPage =
+    await prisma.page.findUnique({
+      where: {
+        slug: cleanSlug,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+  if (existingPage) {
+    throw new Error(
+      "A page already uses this URL slug. Choose a different slug or edit the existing page.",
+    );
+  }
+
   if (cleanTranslations.length === 0) {
     throw new Error(
       "At least one page translation is required.",
@@ -385,6 +401,25 @@ export async function updatePage(
     if (!cleanSlug) {
       throw new Error(
         "Page slug is required.",
+      );
+    }
+
+    const existingPage =
+      await prisma.page.findUnique({
+        where: {
+          slug: cleanSlug,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+    if (
+      existingPage &&
+      existingPage.id !== input.pageId
+    ) {
+      throw new Error(
+        "A page already uses this URL slug. Choose a different slug or edit the existing page.",
       );
     }
 

@@ -323,7 +323,13 @@ export default function AdminDashboard() {
   ============================================================= */
 
   useEffect(() => {
-    void loadDashboard();
+    const loadTimer = window.setTimeout(() => {
+      void loadDashboard();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(loadTimer);
+    };
   }, [loadDashboard]);
 
   /* =============================================================

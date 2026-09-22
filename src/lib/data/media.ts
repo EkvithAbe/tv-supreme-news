@@ -77,19 +77,16 @@ export async function getMedia(options: GetMediaOptions = {}) {
             {
               filename: {
                 contains: search.trim(),
-                mode: "insensitive" as const,
               },
             },
             {
               altText: {
                 contains: search.trim(),
-                mode: "insensitive" as const,
               },
             },
             {
               mimeType: {
                 contains: search.trim(),
-                mode: "insensitive" as const,
               },
             },
           ],

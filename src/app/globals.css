@@ -95,6 +95,25 @@ body {
     color 0.25s ease;
 }
 
+/* Use script-capable system fonts when a Sinhala or Tamil page is active. */
+html[lang="si"] body,
+[lang="si"] {
+  font-family:
+    "Noto Sans Sinhala",
+    "Nirmala UI",
+    "Iskoola Pota",
+    sans-serif;
+}
+
+html[lang="ta"] body,
+[lang="ta"] {
+  font-family:
+    "Noto Sans Tamil",
+    "Nirmala UI",
+    Latha,
+    sans-serif;
+}
+
 a {
   color: inherit;
   text-decoration: none;

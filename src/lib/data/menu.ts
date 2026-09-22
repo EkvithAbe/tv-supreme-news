@@ -37,6 +37,12 @@ export interface MenuItemRecord {
   mobile: boolean;
   openNewTab: boolean;
 
+  /**
+   * True only when this locale has no menu rows and the English menu is
+   * being shown as a safe fallback.
+   */
+  usesEnglishFallback?: boolean;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -208,11 +214,17 @@ function buildMenuRecords(
     updatedAt: Date;
   }>,
   metadataMap: MetadataMap,
+  usesEnglishFallback: boolean | ReadonlySet<string> = false,
 ): MenuItemRecord[] {
   return items.map((item) => {
     const metadata =
       metadataMap[item.id] ??
       defaultMetadata;
+
+    const itemUsesEnglishFallback =
+      typeof usesEnglishFallback === "boolean"
+        ? usesEnglishFallback
+        : usesEnglishFallback.has(item.id);
 
     return {
       ...item,
@@ -240,8 +252,111 @@ function buildMenuRecords(
         "boolean"
           ? metadata.openNewTab
           : false,
+      ...(itemUsesEnglishFallback
+        ? { usesEnglishFallback: true }
+        : {}),
     };
   });
+}
+
+function getMenuHrefKey(href: string): string {
+  const normalized = cleanHref(href)
+    .replace(/^\/(en|si|ta)(?=\/|$)/i, "")
+    .replace(/\/+$/, "");
+
+  return normalized || "/";
+}
+
+/**
+ * Published custom pages are real public destinations, so they belong in the
+ * visitor navigation without an administrator having to create a duplicate
+ * MenuItem by hand. A page appears only in a locale that has its own
+ * translation; that avoids linking Sinhala or Tamil visitors to a 404 page.
+ */
+async function getPublishedPageMenuItems(
+  language: MenuLanguage,
+  startingPosition: number,
+): Promise<MenuItemRecord[]> {
+  const pages = await prisma.page.findMany({
+    where: {
+      status: "PUBLISHED",
+      translations: {
+        some: {
+          language,
+        },
+      },
+    },
+    select: {
+      id: true,
+      slug: true,
+      createdAt: true,
+      updatedAt: true,
+      translations: {
+        where: {
+          language,
+        },
+        select: {
+          id: true,
+          title: true,
+        },
+      },
+    },
+    orderBy: {
+      updatedAt: "desc",
+    },
+  });
+
+  return pages.flatMap((page, index) => {
+    const translation = page.translations[0];
+
+    if (!translation) {
+      return [];
+    }
+
+    return [
+      {
+        id: `page-${page.id}-${translation.id}`,
+        language,
+        label: translation.title,
+        href: `/${page.slug}`,
+        position: startingPosition + index,
+        isVisible: true,
+        type: "Page" as const,
+        desktop: true,
+        mobile: true,
+        openNewTab: false,
+        createdAt: page.createdAt,
+        updatedAt: page.updatedAt,
+      },
+    ];
+  });
+}
+
+async function appendPublishedPageMenuItems(
+  items: MenuItemRecord[],
+  language: MenuLanguage,
+): Promise<MenuItemRecord[]> {
+  const pageItems = await getPublishedPageMenuItems(
+    language,
+    items.reduce(
+      (largestPosition, item) =>
+        Math.max(largestPosition, item.position),
+      -1,
+    ) + 1,
+  );
+  const configuredHrefKeys = new Set(
+    items.map((item) => getMenuHrefKey(item.href)),
+  );
+
+  return [
+    ...items,
+    ...pageItems.filter(
+      (item) =>
+        !configuredHrefKeys.has(
+          getMenuHrefKey(item.href),
+        ),
+    ),
+  ];
 }
 
 /* ============================================================
@@ -264,11 +379,27 @@ export async function getMenuItems(
       getMetadataMap(),
     ]);
 
+  const usesEnglishFallback =
+    items.length === 0 && language !== "EN";
+
+  const fallbackItems =
+    usesEnglishFallback
+      ? await prisma.menuItem.findMany({
+          where: {
+            language: "EN",
+          },
+          orderBy: {
+            position: "asc",
+          },
+        })
+      : items;
+
   return buildMenuRecords(
-    items.map((item) => ({
+    fallbackItems.map((item) => ({
       id: item.id,
-      language:
-        item.language as MenuLanguage,
+      // A locale with no menu records falls back to the English navigation
+      // rather than leaving visitors with an empty header.
+      language,
       label: item.label,
       href: item.href,
       position: item.position,
@@ -277,6 +408,95 @@ export async function getMenuItems(
       updatedAt: item.updatedAt,
     })),
     metadataMap,
+    usesEnglishFallback,
+  );
+}
+
+/* ============================================================
+   GET PUBLIC MENU ITEMS
+
+   English owns the menu structure. Public Sinhala and Tamil
+   navigation merges that structure with any saved local labels, so
+   administrators do not have to recreate each standard menu item.
+============================================================ */
+
+export async function getPublicMenuItems(
+  language: MenuLanguage = "EN",
+): Promise<MenuItemRecord[]> {
+  if (language === "EN") {
+    return appendPublishedPageMenuItems(
+      await getMenuItems("EN"),
+      language,
+    );
+  }
+
+  const [englishItems, localizedItems, metadataMap] =
+    await Promise.all([
+      prisma.menuItem.findMany({
+        where: { language: "EN" },
+        orderBy: { position: "asc" },
+      }),
+      prisma.menuItem.findMany({
+        where: { language },
+        orderBy: { position: "asc" },
+      }),
+      getMetadataMap(),
+    ]);
+
+  const localizedByHref = new Map(
+    localizedItems.map((item) => [
+      getMenuHrefKey(item.href),
+      item,
+    ]),
+  );
+  const usedLocalizedIds = new Set<string>();
+  const englishFallbackIds = new Set<string>();
+
+  const mergedItems = englishItems.map((englishItem) => {
+    const localizedItem = localizedByHref.get(
+      getMenuHrefKey(englishItem.href),
+    );
+
+    if (localizedItem) {
+      usedLocalizedIds.add(localizedItem.id);
+    } else {
+      englishFallbackIds.add(englishItem.id);
+    }
+
+    return {
+      id: englishItem.id,
+      language,
+      label: localizedItem?.label || englishItem.label,
+      href: englishItem.href,
+      position: englishItem.position,
+      isVisible: englishItem.isVisible,
+      createdAt: englishItem.createdAt,
+      updatedAt: englishItem.updatedAt,
+    };
+  });
+
+  const localeOnlyItems = localizedItems
+    .filter((item) => !usedLocalizedIds.has(item.id))
+    .map((item, index) => ({
+      id: item.id,
+      language,
+      label: item.label,
+      href: item.href,
+      position: englishItems.length + index,
+      isVisible: item.isVisible,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+    }));
+
+  const menuItems = buildMenuRecords(
+    [...mergedItems, ...localeOnlyItems],
+    metadataMap,
+    englishFallbackIds,
+  );
+
+  return appendPublishedPageMenuItems(
+    menuItems,
+    language,
   );
 }
 

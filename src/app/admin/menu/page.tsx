@@ -524,7 +524,13 @@ export default function MenuPage() {
     );
 
   useEffect(() => {
-    void loadAllMenus();
+    const loadTimer = window.setTimeout(() => {
+      void loadAllMenus();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(loadTimer);
+    };
   }, [loadAllMenus]);
 
   /* =============================================================
@@ -532,11 +538,17 @@ export default function MenuPage() {
   ============================================================== */
 
   useEffect(() => {
-    setItems(
-      allLanguageItems[
-        selectedLanguage
-      ] ?? [],
-    );
+    const syncTimer = window.setTimeout(() => {
+      setItems(
+        allLanguageItems[
+          selectedLanguage
+        ] ?? [],
+      );
+    }, 0);
+
+    return () => {
+      window.clearTimeout(syncTimer);
+    };
   }, [
     selectedLanguage,
     allLanguageItems,
@@ -3201,7 +3213,7 @@ export default function MenuPage() {
 
             <span>
               Menu data is stored
-              in PostgreSQL.
+              in MySQL.
             </span>
 
           </div>

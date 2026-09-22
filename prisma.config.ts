@@ -1,6 +1,16 @@
 import "dotenv/config";
 
-import { defineConfig, env } from "prisma/config";
+import { defineConfig } from "prisma/config";
+import {
+  createMysqlDatabaseUrl,
+  getDatabaseConnection,
+} from "./src/lib/mysql-config";
+
+const connection = getDatabaseConnection();
+const databaseUrl =
+  connection.kind === "mysql-config"
+    ? createMysqlDatabaseUrl(connection.config)
+    : connection.url;
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -10,6 +20,6 @@ export default defineConfig({
   },
 
   datasource: {
-    url: env("DIRECT_URL"),
+    url: databaseUrl,
   },
 });

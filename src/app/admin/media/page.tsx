@@ -315,7 +315,13 @@ export default function MediaLibraryPage() {
   };
 
   useEffect(() => {
-    void loadMedia();
+    const loadTimer = window.setTimeout(() => {
+      void loadMedia();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(loadTimer);
+    };
   }, []);
 
   const filteredMedia = useMemo(() => {
@@ -1317,7 +1323,7 @@ export default function MediaLibraryPage() {
                 <p className="mt-1 text-xs leading-5 text-pink-700/80">
                   Uploaded files are saved to the
                   server media folder and their
-                  details are stored in PostgreSQL.
+                  details are stored in MySQL.
                 </p>
               </div>
             </div>

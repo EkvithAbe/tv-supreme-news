@@ -1,7 +1,10 @@
 import ArticlesClient from "@/components/admin/ArticlesClient";
+import { requireCmsUserPage } from "@/lib/auth";
 import { getArticles } from "@/lib/data/articles";
 
 export default async function AllNewsPage() {
+  await requireCmsUserPage();
+
   const result = await getArticles({
     language: "EN",
     page: 1,

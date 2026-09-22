@@ -7,9 +7,11 @@ datasource db {
   provider = "postgresql"
 }
 
-/* =========================================================
-   ENUMS
-========================================================= */
+/**
+ * =========================================================
+ * ENUMS
+ * =========================================================
+ */
 
 enum UserRole {
   ADMIN
@@ -78,331 +80,415 @@ enum LiveStreamType {
   OTHER
 }
 
-/* =========================================================
-   USER
-========================================================= */
+/**
+ * =========================================================
+ * USER
+ * =========================================================
+ */
 
 model User {
-  id           String     @id @default(cuid())
+  id           String   @id @default(cuid())
   name         String
-  email        String     @unique
+  email        String   @unique
   passwordHash String
-  role         UserRole   @default(JOURNALIST)
+  role         UserRole @default(JOURNALIST)
 
-  articles     Article[]
+  articles Article[]
 
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-/* =========================================================
-   CATEGORY
-========================================================= */
+/**
+ * =========================================================
+ * NEWS CATEGORY
+ * =========================================================
+ */
 
 model Category {
-  id           String                @id @default(cuid())
-  slug         String                @unique
+  id   String @id @default(cuid())
+  slug String @unique
 
   translations CategoryTranslation[]
   articles     Article[]
-  videos       Video[]
 
-  createdAt    DateTime              @default(now())
-  updatedAt    DateTime              @updatedAt
+  /**
+   * Existing relationship.
+   * Kept unchanged.
+   */
+  videos Video[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model CategoryTranslation {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   categoryId  String
   language    Language
   name        String
   description String?
 
-  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@unique([categoryId, language])
 }
 
-/* =========================================================
-   ARTICLE
-========================================================= */
+/**
+ * =========================================================
+ * VIDEO CATEGORY
+ * =========================================================
+ */
 
-model Article {
-  id                String                @id @default(cuid())
-  slug              String                @unique
+model VideoCategory {
+  id   String @id @default(cuid())
+  slug String @unique
 
-  status            ArticleStatus         @default(DRAFT)
+  translations VideoCategoryTranslation[]
+  videos       Video[]
 
-  categoryId        String
-  authorId          String
-  mainImageId       String?
-
-  isBreaking        Boolean               @default(false)
-  isFeatured        Boolean               @default(false)
-  showOnHomepage    Boolean               @default(false)
-  showInLatest      Boolean               @default(true)
-
-  views             Int                   @default(0)
-
-  publishedAt       DateTime?
-  scheduledAt       DateTime?
-
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
-
-  category          Category              @relation(fields: [categoryId], references: [id])
-  author            User                  @relation(fields: [authorId], references: [id])
-  mainImage         Media?                @relation("ArticleMainImage", fields: [mainImageId], references: [id], onDelete: SetNull)
-
-  translations      ArticleTranslation[]
-  tags              ArticleTag[]
-  media             ArticleMedia[]
-  homepageSections  HomepageSection[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-/* =========================================================
-   ARTICLE TRANSLATION
-========================================================= */
+model VideoCategoryTranslation {
+  id              String   @id @default(cuid())
+  videoCategoryId String
+  language        Language
+  name            String
+  description     String?
+
+  videoCategory VideoCategory @relation(fields: [videoCategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([videoCategoryId, language])
+}
+
+/**
+ * =========================================================
+ * ARTICLE
+ * =========================================================
+ */
+
+model Article {
+  id   String @id @default(cuid())
+  slug String @unique
+
+  status ArticleStatus @default(DRAFT)
+
+  categoryId  String
+  authorId    String
+  mainImageId String?
+
+  isBreaking     Boolean @default(false)
+  isFeatured     Boolean @default(false)
+  showOnHomepage Boolean @default(false)
+  showInLatest   Boolean @default(true)
+
+  views Int @default(0)
+
+  publishedAt DateTime?
+  scheduledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  category  Category @relation(fields: [categoryId], references: [id])
+  author    User     @relation(fields: [authorId], references: [id])
+  mainImage Media?   @relation("ArticleMainImage", fields: [mainImageId], references: [id], onDelete: SetNull)
+
+  translations     ArticleTranslation[]
+  tags             ArticleTag[]
+  media            ArticleMedia[]
+  homepageSections HomepageSection[]
+}
+
+/**
+ * =========================================================
+ * ARTICLE TRANSLATION
+ * =========================================================
+ */
 
 model ArticleTranslation {
-  id             String    @id @default(cuid())
-  articleId      String
-  language       Language
+  id        String   @id @default(cuid())
+  articleId String
+  language  Language
 
-  title          String
-  summary        String?
-  content        String
+  title   String
+  summary String?
+  content String
 
   seoTitle       String?
   seoDescription String?
 
-  article        Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
 
   @@unique([articleId, language])
 }
 
-/* =========================================================
-   TAG
-========================================================= */
+/**
+ * =========================================================
+ * TAG
+ * =========================================================
+ */
 
 model Tag {
-  id        String       @id @default(cuid())
-  slug      String       @unique
-  name      String       @unique
+  id   String @id @default(cuid())
+  slug String @unique
+  name String @unique
 
-  articles  ArticleTag[]
+  articles ArticleTag[]
 
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model ArticleTag {
   articleId String
   tagId     String
 
-  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([articleId, tagId])
 }
 
-/* =========================================================
-   MEDIA
-========================================================= */
+/**
+ * =========================================================
+ * MEDIA
+ * =========================================================
+ */
 
 model Media {
-  id                String              @id @default(cuid())
-  filename          String
-  url               String
-  type              MediaType
+  id       String    @id @default(cuid())
+  filename String
+  url      String
+  type     MediaType
 
-  mimeType          String?
-  size              Int?
-  width             Int?
-  height            Int?
-  altText           String?
+  mimeType String?
+  size     Int?
+  width    Int?
+  height   Int?
+  altText  String?
 
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  mainArticles      Article[]           @relation("ArticleMainImage")
-  articleMedia      ArticleMedia[]
-  videoThumbnails   Video[]             @relation("VideoThumbnail")
-  homepageSections  HomepageSection[]
+  mainArticles     Article[]         @relation("ArticleMainImage")
+  articleMedia     ArticleMedia[]
+  videoThumbnails  Video[]           @relation("VideoThumbnail")
+  homepageSections HomepageSection[]
 }
 
-/* =========================================================
-   ARTICLE MEDIA
-========================================================= */
+/**
+ * =========================================================
+ * ARTICLE MEDIA
+ * =========================================================
+ */
 
 model ArticleMedia {
   articleId String
   mediaId   String
-  sortOrder Int      @default(0)
+  sortOrder Int    @default(0)
 
-  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  media     Media    @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  media   Media   @relation(fields: [mediaId], references: [id], onDelete: Cascade)
 
   @@id([articleId, mediaId])
 }
 
-/* =========================================================
-   VIDEO
-========================================================= */
+/**
+ * =========================================================
+ * VIDEO
+ * =========================================================
+ */
 
 model Video {
-  id               String              @id @default(cuid())
+  id String @id @default(cuid())
 
-  slug             String              @unique
-  title            String
-  description      String?
+  slug        String  @unique
+  title       String
+  description String?
 
-  language         Language            @default(EN)
-  status           VideoStatus         @default(DRAFT)
+  language Language    @default(EN)
+  status   VideoStatus @default(DRAFT)
 
-  categoryId       String?
+  /**
+   * Existing News Category relationship.
+   * Kept unchanged for existing videos.
+   */
+  categoryId String?
 
-  thumbnailId      String?
-  videoUrl         String
+  /**
+   * New Video Category relationship.
+   */
+  videoCategoryId String?
 
-  duration         Int?
-  views            Int                 @default(0)
+  thumbnailId String?
+  videoUrl    String
 
-  isFeatured       Boolean             @default(false)
+  duration Int?
+  views    Int  @default(0)
 
-  publishedAt      DateTime?
-  scheduledAt      DateTime?
+  isFeatured Boolean @default(false)
 
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+  publishedAt DateTime?
+  scheduledAt DateTime?
 
-  category         Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  thumbnail        Media?              @relation("VideoThumbnail", fields: [thumbnailId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /**
+   * Existing News Category relation.
+   */
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  /**
+   * New Video Category relation.
+   */
+  videoCategory VideoCategory? @relation(fields: [videoCategoryId], references: [id], onDelete: SetNull)
+
+  /**
+   * Existing thumbnail relation.
+   */
+  thumbnail Media? @relation("VideoThumbnail", fields: [thumbnailId], references: [id], onDelete: SetNull)
+
   homepageSections HomepageSection[]
 }
 
-/* =========================================================
-   PAGE
-========================================================= */
+/**
+ * =========================================================
+ * PAGE
+ * =========================================================
+ */
 
 model Page {
-  id           String            @id @default(cuid())
-  slug         String            @unique
+  id   String @id @default(cuid())
+  slug String @unique
 
-  status       PageStatus        @default(DRAFT)
+  status PageStatus @default(DRAFT)
 
   translations PageTranslation[]
 
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model PageTranslation {
-  id             String   @id @default(cuid())
-  pageId         String
-  language       Language
+  id       String   @id @default(cuid())
+  pageId   String
+  language Language
 
-  title          String
-  content        String
+  title   String
+  content String
 
   seoTitle       String?
   seoDescription String?
 
-  page           Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
 
   @@unique([pageId, language])
 }
 
-/* =========================================================
-   HOMEPAGE
-========================================================= */
+/**
+ * =========================================================
+ * HOMEPAGE
+ * =========================================================
+ */
 
 model HomepageSection {
-  id         String               @id @default(cuid())
+  id String @id @default(cuid())
 
-  type       HomepageSectionType
-  title      String?
-  position   Int                  @default(0)
+  type     HomepageSectionType
+  title    String?
+  position Int                 @default(0)
 
-  isEnabled  Boolean              @default(true)
+  isEnabled Boolean @default(true)
 
-  articleId  String?
-  videoId    String?
-  mediaId    String?
+  articleId String?
+  videoId   String?
+  mediaId   String?
 
-  article    Article?             @relation(fields: [articleId], references: [id], onDelete: SetNull)
-  video      Video?               @relation(fields: [videoId], references: [id], onDelete: SetNull)
-  media      Media?               @relation(fields: [mediaId], references: [id], onDelete: SetNull)
+  article Article? @relation(fields: [articleId], references: [id], onDelete: SetNull)
+  video   Video?   @relation(fields: [videoId], references: [id], onDelete: SetNull)
+  media   Media?   @relation(fields: [mediaId], references: [id], onDelete: SetNull)
 
-  createdAt  DateTime             @default(now())
-  updatedAt  DateTime             @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-/* =========================================================
-   MENU
-========================================================= */
+/**
+ * =========================================================
+ * MENU
+ * =========================================================
+ */
 
 model MenuItem {
-  id         String    @id @default(cuid())
+  id String @id @default(cuid())
 
-  language   Language  @default(EN)
+  language Language @default(EN)
 
-  label      String
-  href       String
+  label String
+  href  String
 
-  position   Int       @default(0)
-  isVisible  Boolean   @default(true)
+  position  Int     @default(0)
+  isVisible Boolean @default(true)
 
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-/* =========================================================
-   LIVE TV
-========================================================= */
+/**
+ * =========================================================
+ * LIVE TV
+ * =========================================================
+ */
 
 model LiveStream {
-  id           String          @id @default(cuid())
+  id String @id @default(cuid())
 
-  channelName  String
-  streamUrl    String
-  streamType   LiveStreamType  @default(HLS)
+  channelName String
+  streamUrl   String
+  streamType  LiveStreamType @default(HLS)
 
-  isLive       Boolean         @default(false)
-  isEnabled    Boolean         @default(true)
+  isLive    Boolean @default(false)
+  isEnabled Boolean @default(true)
 
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-/* =========================================================
-   CONTACT MESSAGES
-========================================================= */
+/**
+ * =========================================================
+ * CONTACT MESSAGES
+ * =========================================================
+ */
 
 model ContactMessage {
-  id          String               @id @default(cuid())
+  id String @id @default(cuid())
 
-  name        String
-  email       String
-  phone       String?
-  subject     String
-  message     String
+  name    String
+  email   String
+  phone   String?
+  subject String
+  message String
 
-  status      ContactMessageStatus @default(NEW)
+  status ContactMessageStatus @default(NEW)
 
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-/* =========================================================
-   SETTINGS
-========================================================= */
+/**
+ * =========================================================
+ * SETTINGS
+ * =========================================================
+ */
 
 model SiteSetting {
-  id        String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  key       String   @unique
-  value     String
+  key   String @unique
+  value String
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -53,6 +53,8 @@ type VideoItem = {
   thumbnailId: string | null;
   category: string;
   categoryId: string | null;
+  videoCategoryId: string | null;
+  videoCategoryName: string | null;
   status: VideoStatus;
   language: LanguageLabel;
   duration: string;
@@ -286,6 +288,8 @@ function mapApiVideo(
     status: string;
     categoryId: string | null;
     categoryName: string | null;
+    videoCategoryId: string | null;
+    videoCategoryName: string | null;
     thumbnailId: string | null;
     thumbnailUrl: string | null;
     videoUrl: string;
@@ -308,10 +312,16 @@ function mapApiVideo(
     thumbnailId:
       item.thumbnailId,
     category:
+      item.videoCategoryName ||
       item.categoryName ||
       "Uncategorized",
     categoryId:
+      item.videoCategoryId ||
       item.categoryId,
+    videoCategoryId:
+      item.videoCategoryId,
+    videoCategoryName:
+      item.videoCategoryName,
     status:
       mapStatusFromApi(item.status),
     language:
@@ -389,6 +399,24 @@ function parseApiVideos(
               : String(
                   item.categoryName,
                 ),
+          videoCategoryId:
+            item.videoCategoryId ===
+              null ||
+            item.videoCategoryId ===
+              undefined
+              ? null
+              : String(
+                  item.videoCategoryId,
+                ),
+          videoCategoryName:
+            item.videoCategoryName ===
+              null ||
+            item.videoCategoryName ===
+              undefined
+              ? null
+              : String(
+                  item.videoCategoryName,
+                ),
           thumbnailId:
             item.thumbnailId ===
               null ||
@@ -448,7 +476,7 @@ export default function VideosPage() {
   const [videos, setVideos] =
     useState<VideoItem[]>([]);
 
-  const [categories, setCategories] =
+  const [videoCategories, setVideoCategories] =
     useState<CategoryOption[]>([]);
 
   const [thumbnails, setThumbnails] =
@@ -462,8 +490,8 @@ export default function VideosPage() {
       (typeof statusFilters)[number]["value"]
     >("All");
 
-  const [categoryFilter, setCategoryFilter] =
-    useState("All Categories");
+  const [videoCategoryFilter, setVideoCategoryFilter] =
+    useState("All Video Categories");
 
   const [sortOrder, setSortOrder] =
     useState<
@@ -485,7 +513,7 @@ export default function VideosPage() {
   const [description, setDescription] =
     useState("");
 
-  const [categoryId, setCategoryId] =
+  const [videoCategoryId, setVideoCategoryId] =
     useState("");
 
   const [language, setLanguage] =
@@ -525,7 +553,7 @@ export default function VideosPage() {
 
       const [
         videosResponse,
-        categoriesResponse,
+        videoCategoriesResponse,
         mediaResponse,
       ] = await Promise.all([
         fetch(
@@ -535,7 +563,7 @@ export default function VideosPage() {
           },
         ),
         fetch(
-          "/api/admin/categories?language=EN",
+          "/api/admin/video-categories?language=EN",
           {
             cache: "no-store",
           },
@@ -550,11 +578,11 @@ export default function VideosPage() {
 
       const [
         videosData,
-        categoriesData,
+        videoCategoriesData,
         mediaData,
       ] = await Promise.all([
         videosResponse.json(),
-        categoriesResponse.json(),
+        videoCategoriesResponse.json(),
         mediaResponse.json(),
       ]);
 
@@ -586,21 +614,21 @@ export default function VideosPage() {
       );
 
       if (
-        categoriesResponse.ok &&
-        categoriesData.success
+        videoCategoriesResponse.ok &&
+        videoCategoriesData.success
       ) {
         const categoryItems =
           Array.isArray(
-            categoriesData.categories,
+            videoCategoriesData.categories,
           )
-            ? categoriesData.categories
+            ? videoCategoriesData.categories
             : Array.isArray(
-                  categoriesData.items,
+                  videoCategoriesData.items,
                 )
-              ? categoriesData.items
+              ? videoCategoriesData.items
               : [];
 
-        setCategories(
+        setVideoCategories(
           categoryItems
             .filter(
               (
@@ -647,7 +675,7 @@ export default function VideosPage() {
             ),
         );
       } else {
-        setCategories([]);
+        setVideoCategories([]);
       }
 
       if (
@@ -744,15 +772,15 @@ export default function VideosPage() {
     void loadData();
   }, []);
 
-  const categoryNames = useMemo(
+  const videoCategoryNames = useMemo(
     () => [
-      "All Categories",
-      ...categories.map(
+      "All Video Categories",
+      ...videoCategories.map(
         (item: CategoryOption) =>
           item.name,
       ),
     ],
-    [categories],
+    [videoCategories],
   );
 
   const filteredVideos = useMemo(() => {
@@ -779,16 +807,16 @@ export default function VideosPage() {
             video.status ===
               statusFilter;
 
-          const matchesCategory =
-            categoryFilter ===
-              "All Categories" ||
+          const matchesVideoCategory =
+            videoCategoryFilter ===
+              "All Video Categories" ||
             video.category ===
-              categoryFilter;
+              videoCategoryFilter;
 
           return (
             matchesSearch &&
             matchesStatus &&
-            matchesCategory
+            matchesVideoCategory
           );
         },
       );
@@ -829,7 +857,7 @@ export default function VideosPage() {
     videos,
     search,
     statusFilter,
-    categoryFilter,
+    videoCategoryFilter,
     sortOrder,
   ]);
 
@@ -877,8 +905,8 @@ export default function VideosPage() {
   const resetForm = () => {
     setTitle("");
     setDescription("");
-    setCategoryId(
-      categories[0]?.id || "",
+    setVideoCategoryId(
+      videoCategories[0]?.id || "",
     );
     setLanguage("English");
     setDuration("");
@@ -903,8 +931,10 @@ export default function VideosPage() {
     setDescription(
       video.description,
     );
-    setCategoryId(
-      video.categoryId || "",
+    setVideoCategoryId(
+      video.videoCategoryId ||
+        video.categoryId ||
+        "",
     );
     setLanguage(video.language);
     setDuration(video.duration);
@@ -973,11 +1003,11 @@ export default function VideosPage() {
     }
 
     if (
-      !categoryId &&
-      categories.length > 0
+      !videoCategoryId &&
+      videoCategories.length > 0
     ) {
       setError(
-        "Please select a category.",
+        "Please select a video category.",
       );
       return;
     }
@@ -1007,8 +1037,8 @@ export default function VideosPage() {
           ),
         status:
           mapStatusToApi(status),
-        categoryId:
-          categoryId || null,
+        videoCategoryId:
+          videoCategoryId || null,
         thumbnailId:
           thumbnailId || null,
         videoUrl:
@@ -1238,6 +1268,14 @@ export default function VideosPage() {
                 data.video
                   .categoryName ??
                 null,
+              videoCategoryId:
+                data.video
+                  .videoCategoryId ??
+                null,
+              videoCategoryName:
+                data.video
+                  .videoCategoryName ??
+                null,
               thumbnailId:
                 data.video
                   .thumbnailId ??
@@ -1406,17 +1444,17 @@ export default function VideosPage() {
               <div className="relative">
                 <select
                   value={
-                    categoryFilter
+                    videoCategoryFilter
                   }
                   onChange={(event) =>
-                    setCategoryFilter(
+                    setVideoCategoryFilter(
                       event.target
                         .value,
                     )
                   }
                   className="appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 pr-9 text-sm font-medium text-slate-600 outline-none transition focus:border-pink-400"
                 >
-                  {categoryNames.map(
+                  {videoCategoryNames.map(
                     (item: string) => (
                       <option
                         key={item}
@@ -1504,7 +1542,7 @@ export default function VideosPage() {
                 </th>
 
                 <th className="px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-400">
-                  Category
+                  Video Category
                 </th>
 
                 <th className="px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-400">
@@ -2078,15 +2116,15 @@ export default function VideosPage() {
                     htmlFor="videoCategory"
                     className="mb-2 block text-sm font-semibold text-slate-700"
                   >
-                    Category
+                    Video Category
                   </label>
 
                   <div className="relative">
                     <select
                       id="videoCategory"
-                      value={categoryId}
+                      value={videoCategoryId}
                       onChange={(event) =>
-                        setCategoryId(
+                        setVideoCategoryId(
                           event.target
                             .value,
                         )
@@ -2094,10 +2132,10 @@ export default function VideosPage() {
                       className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm text-slate-700 outline-none focus:border-pink-400"
                     >
                       <option value="">
-                        Select category
+                        Select video category
                       </option>
 
-                      {categories.map(
+                      {videoCategories.map(
                         (
                           item: CategoryOption,
                         ) => (

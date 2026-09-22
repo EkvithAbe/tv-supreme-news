@@ -108,6 +108,12 @@ const menuGroups = [
       },
 
       {
+        label: "Video Categories",
+        href: "/admin/video-categories",
+        icon: FolderTree,
+      },
+
+      {
         label: "Live TV",
         href: "/admin/live-tv",
         icon: Radio,

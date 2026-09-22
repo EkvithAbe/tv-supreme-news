@@ -3,7 +3,6 @@ import {
   CalendarDays,
   ChevronRight,
   Eye,
-  Globe2,
   Play,
   Radio,
   Video as VideoIcon,
@@ -18,9 +17,20 @@ interface VideoPageProps {
   params: Promise<{
     locale: string;
   }>;
+  searchParams?: Promise<{
+    category?: string;
+  }>;
 }
 
 type SupportedLanguage = "EN" | "SI" | "TA";
+
+type VideoCategoryItem = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  videoCount: number;
+};
 
 function getLanguage(
   locale: string,
@@ -73,8 +83,12 @@ function formatDuration(
     return "";
   }
 
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
+  const minutes = Math.floor(
+    seconds / 60,
+  );
+
+  const remainingSeconds =
+    seconds % 60;
 
   return `${minutes}:${String(
     remainingSeconds,
@@ -120,10 +134,19 @@ function getYouTubeEmbedUrl(
           return `https://www.youtube.com/embed/${videoId}`;
         }
       }
+
+      if (
+        parsed.pathname.startsWith(
+          "/embed/",
+        )
+      ) {
+        return url;
+      }
     }
 
     if (
-      parsed.hostname === "youtu.be"
+      parsed.hostname ===
+      "youtu.be"
     ) {
       const videoId =
         parsed.pathname.replace(
@@ -145,7 +168,8 @@ function getYouTubeEmbedUrl(
 function isHostedEmbed(
   url: string,
 ) {
-  const value = url.toLowerCase();
+  const value =
+    url.toLowerCase();
 
   return (
     value.includes(
@@ -166,7 +190,8 @@ function isHostedEmbed(
 function isDirectVideo(
   url: string,
 ) {
-  const value = url.toLowerCase();
+  const value =
+    url.toLowerCase();
 
   return (
     value.includes(".mp4") ||
@@ -178,19 +203,58 @@ function isDirectVideo(
 
 export default async function VideoPage({
   params,
+  searchParams,
 }: VideoPageProps) {
   const { locale } = await params;
 
   const language =
     getLanguage(locale);
 
+  const resolvedSearchParams =
+    searchParams
+      ? await searchParams
+      : {};
+
+  const selectedCategorySlug =
+    typeof resolvedSearchParams.category ===
+    "string"
+      ? resolvedSearchParams.category.trim()
+      : "";
+
   /*
    * ============================================================
-   * LOAD PUBLISHED VIDEOS
+   * LOAD VIDEO CATEGORIES
+   * ============================================================
+   *
+   * These are completely separate from News Categories.
+   */
+  const videoCategoryRows =
+    await prisma.videoCategory.findMany({
+      select: {
+        id: true,
+        slug: true,
+        translations: {
+          where: {
+            language,
+          },
+          select: {
+            name: true,
+            description: true,
+          },
+          take: 1,
+        },
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+  /*
+   * ============================================================
+   * LOAD ALL PUBLISHED VIDEOS
    * ============================================================
    */
-
-  const videos =
+  const allVideos =
     await prisma.video.findMany({
       where: {
         language,
@@ -212,13 +276,78 @@ export default async function VideoPage({
 
   /*
    * ============================================================
-   * LOAD THUMBNAILS
-   *
-   * We load Media separately to avoid relation typing
-   * issues with the current Prisma setup.
+   * CATEGORY COUNTS
    * ============================================================
    */
+  const videoCountMap =
+    new Map<string, number>();
 
+  for (const video of allVideos) {
+    if (!video.videoCategoryId) {
+      continue;
+    }
+
+    videoCountMap.set(
+      video.videoCategoryId,
+      (videoCountMap.get(
+        video.videoCategoryId,
+      ) ?? 0) + 1,
+    );
+  }
+
+  const videoCategories: VideoCategoryItem[] =
+    videoCategoryRows.map(
+      (category) => ({
+        id: category.id,
+        slug: category.slug,
+        name:
+          category.translations[0]
+            ?.name ??
+          category.slug,
+        description:
+          category.translations[0]
+            ?.description ??
+          null,
+        videoCount:
+          videoCountMap.get(
+            category.id,
+          ) ?? 0,
+      }),
+    );
+
+  /*
+   * ============================================================
+   * SELECT CATEGORY
+   * ============================================================
+   */
+  const selectedCategory =
+    selectedCategorySlug
+      ? videoCategories.find(
+          (category) =>
+            category.slug ===
+            selectedCategorySlug,
+        ) ?? null
+      : null;
+
+  /*
+   * ============================================================
+   * FILTER VIDEOS
+   * ============================================================
+   */
+  const videos =
+    selectedCategory
+      ? allVideos.filter(
+          (video) =>
+            video.videoCategoryId ===
+            selectedCategory.id,
+        )
+      : allVideos;
+
+  /*
+   * ============================================================
+   * LOAD THUMBNAILS
+   * ============================================================
+   */
   const thumbnailIds =
     videos
       .map(
@@ -258,12 +387,13 @@ export default async function VideoPage({
    * FEATURED + REGULAR VIDEOS
    * ============================================================
    */
-
   const featuredVideo =
     videos.find(
       (video) =>
         video.isFeatured,
-    ) ?? videos[0] ?? null;
+    ) ??
+    videos[0] ??
+    null;
 
   const remainingVideos =
     featuredVideo
@@ -281,11 +411,19 @@ export default async function VideoPage({
         )
       : null;
 
+  /*
+   * ============================================================
+   * NAVIGATION
+   * ============================================================
+   */
   const latestHref =
     `/${locale}/latest`;
 
   const liveHref =
     `/${locale}/watch-live`;
+
+  const allVideosHref =
+    `/${locale}/video`;
 
   return (
     <main className="min-h-screen bg-white">
@@ -348,6 +486,192 @@ export default async function VideoPage({
 
       <section className="py-10 sm:py-12 lg:py-14">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+
+          {/* =====================================================
+              BROWSE BY CATEGORY
+          ====================================================== */}
+
+          {videoCategories.length >
+            0 && (
+            <section className="mb-12">
+              <div className="mb-6 flex items-end justify-between gap-4">
+                <div>
+                  <span className="text-sm font-bold uppercase tracking-[0.16em] text-pink-600">
+                    Video Categories
+                  </span>
+
+                  <h2 className="mt-2 text-2xl font-black text-[#111d4a] sm:text-3xl">
+                    Browse by Category
+                  </h2>
+                </div>
+
+                {selectedCategory && (
+                  <Link
+                    href={allVideosHref}
+                    className="hidden text-sm font-bold text-[#5f19c8] transition hover:text-pink-600 sm:inline-flex sm:items-center sm:gap-1"
+                  >
+                    View All
+                    <ChevronRight
+                      size={15}
+                    />
+                  </Link>
+                )}
+              </div>
+
+              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
+                {/* ALL VIDEOS */}
+
+                <Link
+                  href={allVideosHref}
+                  className={`flex min-w-[150px] shrink-0 items-center gap-3 rounded-2xl border px-4 py-3 transition ${
+                    !selectedCategory
+                      ? "border-[#5f19c8] bg-[#5f19c8] text-white shadow-md"
+                      : "border-slate-200 bg-white text-[#111d4a] hover:border-[#5f19c8] hover:text-[#5f19c8]"
+                  }`}
+                >
+                  <span
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                      !selectedCategory
+                        ? "bg-white/15 text-white"
+                        : "bg-pink-50 text-pink-600"
+                    }`}
+                  >
+                    <VideoIcon
+                      size={19}
+                    />
+                  </span>
+
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold">
+                      All Videos
+                    </span>
+
+                    <span
+                      className={`mt-0.5 block text-[11px] ${
+                        !selectedCategory
+                          ? "text-white/70"
+                          : "text-slate-400"
+                      }`}
+                    >
+                      {allVideos.length}{" "}
+                      {allVideos.length ===
+                      1
+                        ? "video"
+                        : "videos"}
+                    </span>
+                  </span>
+                </Link>
+
+                {/* VIDEO CATEGORIES */}
+
+                {videoCategories.map(
+                  (category) => {
+                    const active =
+                      selectedCategory?.id ===
+                      category.id;
+
+                    const categoryHref =
+                      `/${locale}/video?category=${encodeURIComponent(
+                        category.slug,
+                      )}`;
+
+                    return (
+                      <Link
+                        key={
+                          category.id
+                        }
+                        href={
+                          categoryHref
+                        }
+                        className={`flex min-w-[180px] shrink-0 items-center gap-3 rounded-2xl border px-4 py-3 transition ${
+                          active
+                            ? "border-[#5f19c8] bg-[#5f19c8] text-white shadow-md"
+                            : "border-slate-200 bg-white text-[#111d4a] hover:border-[#5f19c8] hover:text-[#5f19c8]"
+                        }`}
+                      >
+                        <span
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                            active
+                              ? "bg-white/15 text-white"
+                              : "bg-purple-50 text-[#5f19c8]"
+                          }`}
+                        >
+                          <VideoIcon
+                            size={19}
+                          />
+                        </span>
+
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-bold">
+                            {
+                              category.name
+                            }
+                          </span>
+
+                          <span
+                            className={`mt-0.5 block text-[11px] ${
+                              active
+                                ? "text-white/70"
+                                : "text-slate-400"
+                            }`}
+                          >
+                            {
+                              category.videoCount
+                            }{" "}
+                            {category.videoCount ===
+                            1
+                              ? "video"
+                              : "videos"}
+                          </span>
+                        </span>
+                      </Link>
+                    );
+                  },
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* =====================================================
+              FILTER INFORMATION
+          ====================================================== */}
+
+          {selectedCategory && (
+            <section className="mb-10 rounded-2xl border border-purple-100 bg-purple-50/60 px-5 py-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#5f19c8]">
+                    Selected Category
+                  </p>
+
+                  <h2 className="mt-1 text-lg font-black text-[#111d4a]">
+                    {
+                      selectedCategory.name
+                    }
+                  </h2>
+
+                  {selectedCategory.description && (
+                    <p className="mt-1 text-sm text-slate-500">
+                      {
+                        selectedCategory.description
+                      }
+                    </p>
+                  )}
+                </div>
+
+                <Link
+                  href={allVideosHref}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-[#111d4a] transition hover:border-[#5f19c8] hover:text-[#5f19c8]"
+                >
+                  All Videos
+                  <ChevronRight
+                    size={15}
+                  />
+                </Link>
+              </div>
+            </section>
+          )}
+
           {videos.length === 0 ? (
             <div className="rounded-[24px] border border-slate-200 bg-white px-6 py-20 text-center shadow-sm">
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-pink-50 text-pink-600">
@@ -361,9 +685,22 @@ export default async function VideoPage({
               </h2>
 
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-                Published TV SUPREME videos
-                will appear here.
+                {selectedCategory
+                  ? `There are currently no published videos in ${selectedCategory.name}.`
+                  : "Published TV SUPREME videos will appear here."}
               </p>
+
+              {selectedCategory && (
+                <Link
+                  href={allVideosHref}
+                  className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#5f19c8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#3c2372]"
+                >
+                  View All Videos
+                  <ChevronRight
+                    size={15}
+                  />
+                </Link>
+              )}
             </div>
           ) : (
             <>
@@ -510,6 +847,14 @@ export default async function VideoPage({
                           TV SUPREME
                         </p>
 
+                        {selectedCategory && (
+                          <span className="mt-3 inline-flex w-fit rounded-full bg-purple-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-[#5f19c8]">
+                            {
+                              selectedCategory.name
+                            }
+                          </span>
+                        )}
+
                         <h3 className="mt-3 text-2xl font-black leading-tight text-[#111d4a] sm:text-3xl">
                           {
                             featuredVideo.title
@@ -543,8 +888,7 @@ export default async function VideoPage({
                               size={14}
                             />
 
-                            {featuredVideo.views.toLocaleString()}
-                            {" "}
+                            {featuredVideo.views.toLocaleString()}{" "}
                             views
                           </span>
                         </div>
@@ -555,7 +899,7 @@ export default async function VideoPage({
               )}
 
               {/* ===================================================
-                  ALL VIDEOS
+                  MORE VIDEOS
               ==================================================== */}
 
               {remainingVideos.length >
@@ -591,6 +935,17 @@ export default async function VideoPage({
                             video.videoUrl,
                           );
 
+                        const category =
+                          video.videoCategoryId
+                            ? videoCategories.find(
+                                (
+                                  item,
+                                ) =>
+                                  item.id ===
+                                  video.videoCategoryId,
+                              )
+                            : null;
+
                         return (
                           <article
                             key={
@@ -625,14 +980,13 @@ export default async function VideoPage({
 
                               {/* Play */}
 
-                              {video.videoUrl && (
-                                hostedEmbed ||
+                              {video.videoUrl &&
+                              (hostedEmbed ||
                                 youtubeEmbed ||
                                 isDirectVideo(
                                   video.videoUrl,
                                 ) ||
-                                thumbnail
-                              ) ? (
+                                thumbnail) ? (
                                 <a
                                   href={
                                     hostedEmbed ||
@@ -678,7 +1032,15 @@ export default async function VideoPage({
                             {/* Content */}
 
                             <div className="p-4">
-                              <h3 className="line-clamp-2 text-base font-bold leading-6 text-[#111d4a] transition group-hover:text-pink-600">
+                              {category && (
+                                <span className="inline-flex rounded-full bg-purple-50 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide text-[#5f19c8]">
+                                  {
+                                    category.name
+                                  }
+                                </span>
+                              )}
+
+                              <h3 className="mt-2 line-clamp-2 text-base font-bold leading-6 text-[#111d4a] transition group-hover:text-pink-600">
                                 {
                                   video.title
                                 }

@@ -53,31 +53,22 @@ function isValidStatus(
 function parseDate(
   value: unknown,
 ): Date | null | undefined {
-  if (
-    value === undefined
-  ) {
+  if (value === undefined) {
     return undefined;
   }
 
-  if (
-    value === null ||
-    value === ""
-  ) {
+  if (value === null || value === "") {
     return null;
   }
 
   if (typeof value !== "string") {
-    throw new Error(
-      "Invalid date value.",
-    );
+    throw new Error("Invalid date value.");
   }
 
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    throw new Error(
-      "Invalid date value.",
-    );
+    throw new Error("Invalid date value.");
   }
 
   return date;
@@ -86,16 +77,11 @@ function parseDate(
 function parseDuration(
   value: unknown,
 ): number | null | undefined {
-  if (
-    value === undefined
-  ) {
+  if (value === undefined) {
     return undefined;
   }
 
-  if (
-    value === null ||
-    value === ""
-  ) {
+  if (value === null || value === "") {
     return null;
   }
 
@@ -121,6 +107,7 @@ function parseDuration(
  * /api/admin/videos?search=cricket
  * /api/admin/videos?status=PUBLISHED
  * /api/admin/videos?categoryId=abc
+ * /api/admin/videos?videoCategoryId=abc
  * /api/admin/videos?language=EN
  */
 export async function GET(
@@ -131,37 +118,29 @@ export async function GET(
       new URL(request.url);
 
     const search =
-      searchParams.get(
-        "search",
-      ) ?? "";
+      searchParams.get("search") ?? "";
 
     const statusParam =
-      searchParams.get(
-        "status",
-      );
+      searchParams.get("status");
 
     const categoryId =
-      searchParams.get(
-        "categoryId",
-      ) ?? undefined;
+      searchParams.get("categoryId") ??
+      undefined;
+
+    const videoCategoryId =
+      searchParams.get("videoCategoryId") ??
+      undefined;
 
     const languageParam =
-      searchParams.get(
-        "language",
-      );
+      searchParams.get("language");
 
     const pageParam = Number(
-      searchParams.get(
-        "page",
-      ) ?? "1",
+      searchParams.get("page") ?? "1",
     );
 
-    const pageSizeParam =
-      Number(
-        searchParams.get(
-          "pageSize",
-        ) ?? "100",
-      );
+    const pageSizeParam = Number(
+      searchParams.get("pageSize") ?? "100",
+    );
 
     const page = Number.isFinite(
       pageParam,
@@ -169,12 +148,11 @@ export async function GET(
       ? pageParam
       : 1;
 
-    const pageSize =
-      Number.isFinite(
-        pageSizeParam,
-      )
-        ? pageSizeParam
-        : 100;
+    const pageSize = Number.isFinite(
+      pageSizeParam,
+    )
+      ? pageSizeParam
+      : 100;
 
     const status =
       isValidStatus(statusParam)
@@ -182,21 +160,19 @@ export async function GET(
         : undefined;
 
     const language =
-      isValidLanguage(
-        languageParam,
-      )
+      isValidLanguage(languageParam)
         ? languageParam
         : undefined;
 
-    const result =
-      await getVideos({
-        search,
-        status,
-        categoryId,
-        language,
-        page,
-        pageSize,
-      });
+    const result = await getVideos({
+      search,
+      status,
+      categoryId,
+      videoCategoryId,
+      language,
+      page,
+      pageSize,
+    });
 
     return NextResponse.json({
       success: true,
@@ -211,8 +187,7 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-        message:
-          "Failed to load videos.",
+        message: "Failed to load videos.",
       },
       {
         status: 500,
@@ -224,20 +199,7 @@ export async function GET(
 /**
  * POST /api/admin/videos
  *
- * JSON:
- * {
- *   "title": "...",
- *   "description": "...",
- *   "language": "EN",
- *   "status": "DRAFT",
- *   "categoryId": "...",
- *   "thumbnailId": "...",
- *   "videoUrl": "...",
- *   "duration": 252,
- *   "isFeatured": false,
- *   "publishedAt": "...",
- *   "scheduledAt": "..."
- * }
+ * Creates a new video.
  */
 export async function POST(
   request: Request,
@@ -252,8 +214,7 @@ export async function POST(
         : "";
 
     const videoUrl =
-      typeof body.videoUrl ===
-      "string"
+      typeof body.videoUrl === "string"
         ? body.videoUrl.trim()
         : "";
 
@@ -288,16 +249,11 @@ export async function POST(
         ? "EN"
         : body.language;
 
-    if (
-      !isValidLanguage(
-        language,
-      )
-    ) {
+    if (!isValidLanguage(language)) {
       return NextResponse.json(
         {
           success: false,
-          message:
-            "Invalid language.",
+          message: "Invalid language.",
         },
         {
           status: 400,
@@ -310,9 +266,7 @@ export async function POST(
         ? "DRAFT"
         : body.status;
 
-    if (
-      !isValidStatus(status)
-    ) {
+    if (!isValidStatus(status)) {
       return NextResponse.json(
         {
           success: false,
@@ -326,33 +280,25 @@ export async function POST(
     }
 
     const duration =
-      parseDuration(
-        body.duration,
-      );
+      parseDuration(body.duration);
 
     const publishedAt =
-      parseDate(
-        body.publishedAt,
-      );
+      parseDate(body.publishedAt);
 
     const scheduledAt =
-      parseDate(
-        body.scheduledAt,
-      );
+      parseDate(body.scheduledAt);
 
     const video =
       await createVideo({
         slug:
-          typeof body.slug ===
-          "string"
+          typeof body.slug === "string"
             ? body.slug
             : undefined,
 
         title,
 
         description:
-          typeof body.description ===
-          "string"
+          typeof body.description === "string"
             ? body.description
             : null,
 
@@ -360,15 +306,25 @@ export async function POST(
 
         status,
 
+        /*
+         * Keep the old news Category field
+         * for compatibility with existing data.
+         */
         categoryId:
-          typeof body.categoryId ===
-          "string"
+          typeof body.categoryId === "string"
             ? body.categoryId
             : null,
 
+        /*
+         * New Video Category field.
+         */
+        videoCategoryId:
+          typeof body.videoCategoryId === "string"
+            ? body.videoCategoryId
+            : null,
+
         thumbnailId:
-          typeof body.thumbnailId ===
-          "string"
+          typeof body.thumbnailId === "string"
             ? body.thumbnailId
             : null,
 
@@ -453,8 +409,7 @@ export async function PUT(
       return NextResponse.json(
         {
           success: false,
-          message:
-            "Video not found.",
+          message: "Video not found.",
         },
         {
           status: 404,
@@ -469,6 +424,7 @@ export async function PUT(
       language?: VideoLanguageValue;
       status?: VideoStatusValue;
       categoryId?: string | null;
+      videoCategoryId?: string | null;
       thumbnailId?: string | null;
       videoUrl?: string;
       duration?: number | null;
@@ -477,18 +433,14 @@ export async function PUT(
       scheduledAt?: Date | null;
     } = {};
 
-    if (
-      body.slug !== undefined
-    ) {
+    if (body.slug !== undefined) {
       updateData.slug =
         typeof body.slug === "string"
           ? body.slug
           : "";
     }
 
-    if (
-      body.title !== undefined
-    ) {
+    if (body.title !== undefined) {
       updateData.title =
         typeof body.title === "string"
           ? body.title
@@ -500,8 +452,7 @@ export async function PUT(
       undefined
     ) {
       updateData.description =
-        typeof body.description ===
-        "string"
+        typeof body.description === "string"
           ? body.description
           : null;
     }
@@ -556,6 +507,9 @@ export async function PUT(
         body.status;
     }
 
+    /*
+     * Existing Category field.
+     */
     if (
       body.categoryId !==
       undefined
@@ -564,6 +518,20 @@ export async function PUT(
         typeof body.categoryId ===
         "string"
           ? body.categoryId
+          : null;
+    }
+
+    /*
+     * New Video Category field.
+     */
+    if (
+      body.videoCategoryId !==
+      undefined
+    ) {
+      updateData.videoCategoryId =
+        typeof body.videoCategoryId ===
+        "string"
+          ? body.videoCategoryId
           : null;
     }
 
@@ -721,7 +689,7 @@ export async function DELETE(
 /**
  * PATCH /api/admin/videos
  *
- * Update status.
+ * Update video status.
  *
  * JSON:
  * {

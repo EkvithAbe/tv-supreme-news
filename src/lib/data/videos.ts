@@ -28,6 +28,8 @@ export type VideoItem = {
   status: VideoStatusValue;
   categoryId: string | null;
   categoryName: string | null;
+  videoCategoryId: string | null;
+  videoCategoryName: string | null;
   thumbnailId: string | null;
   thumbnailUrl: string | null;
   videoUrl: string;
@@ -44,6 +46,7 @@ export type GetVideosOptions = {
   search?: string;
   status?: VideoStatusValue;
   categoryId?: string;
+  videoCategoryId?: string;
   language?: VideoLanguageValue;
   page?: number;
   pageSize?: number;
@@ -56,6 +59,7 @@ export type CreateVideoInput = {
   language?: VideoLanguageValue;
   status?: VideoStatusValue;
   categoryId?: string | null;
+  videoCategoryId?: string | null;
   thumbnailId?: string | null;
   videoUrl: string;
   duration?: number | null;
@@ -71,6 +75,7 @@ export type UpdateVideoInput = {
   language?: VideoLanguageValue;
   status?: VideoStatusValue;
   categoryId?: string | null;
+  videoCategoryId?: string | null;
   thumbnailId?: string | null;
   videoUrl?: string;
   duration?: number | null;
@@ -100,6 +105,7 @@ function mapVideo(
     language: Language;
     status: VideoStatus;
     categoryId: string | null;
+    videoCategoryId: string | null;
     thumbnailId: string | null;
     videoUrl: string;
     duration: number | null;
@@ -111,6 +117,7 @@ function mapVideo(
     updatedAt: Date;
   },
   categoryName: string | null,
+  videoCategoryName: string | null,
   thumbnailUrl: string | null,
 ): VideoItem {
   return {
@@ -122,6 +129,8 @@ function mapVideo(
     status: toVideoStatus(video.status),
     categoryId: video.categoryId,
     categoryName,
+    videoCategoryId: video.videoCategoryId,
+    videoCategoryName,
     thumbnailId: video.thumbnailId,
     thumbnailUrl,
     videoUrl: video.videoUrl,
@@ -174,6 +183,50 @@ async function getCategoryNames(
   return new Map(
     translations.map((translation) => [
       translation.categoryId,
+      translation.name,
+    ]),
+  );
+}
+
+async function getVideoCategoryNames(
+  videoCategoryIds: string[],
+  language: VideoLanguageValue,
+) {
+  if (videoCategoryIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const categories =
+    await prisma.videoCategory.findMany({
+      where: {
+        id: {
+          in: videoCategoryIds,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+  const translations =
+    await prisma.videoCategoryTranslation.findMany({
+      where: {
+        videoCategoryId: {
+          in: categories.map(
+            (category) => category.id,
+          ),
+        },
+        language: language as Language,
+      },
+      select: {
+        videoCategoryId: true,
+        name: true,
+      },
+    });
+
+  return new Map(
+    translations.map((translation) => [
+      translation.videoCategoryId,
       translation.name,
     ]),
   );
@@ -259,6 +312,7 @@ export async function getVideos(
     search = "",
     status,
     categoryId,
+    videoCategoryId,
     language,
     page = 1,
     pageSize = 50,
@@ -284,6 +338,11 @@ export async function getVideos(
     ...(categoryId
       ? {
           categoryId,
+        }
+      : {}),
+    ...(videoCategoryId
+      ? {
+          videoCategoryId,
         }
       : {}),
     ...(language
@@ -355,6 +414,22 @@ export async function getVideos(
     ),
   ];
 
+  const videoCategoryIds = [
+    ...new Set(
+      videos
+        .map(
+          (video) =>
+            video.videoCategoryId,
+        )
+        .filter(
+          (
+            value,
+          ): value is string =>
+            Boolean(value),
+        ),
+    ),
+  ];
+
   const thumbnailIds = [
     ...new Set(
       videos
@@ -377,6 +452,12 @@ export async function getVideos(
       language ?? "EN",
     );
 
+  const videoCategoryNames =
+    await getVideoCategoryNames(
+      videoCategoryIds,
+      language ?? "EN",
+    );
+
   const thumbnailUrls =
     await getThumbnailUrls(
       thumbnailIds,
@@ -389,6 +470,11 @@ export async function getVideos(
         video.categoryId
           ? categoryNames.get(
               video.categoryId,
+            ) ?? null
+          : null,
+        video.videoCategoryId
+          ? videoCategoryNames.get(
+              video.videoCategoryId,
             ) ?? null
           : null,
         video.thumbnailId
@@ -438,6 +524,19 @@ export async function getVideoById(
           string
         >();
 
+  const videoCategoryNames =
+    video.videoCategoryId
+      ? await getVideoCategoryNames(
+          [video.videoCategoryId],
+          toVideoLanguage(
+            video.language,
+          ),
+        )
+      : new Map<
+          string,
+          string
+        >();
+
   const thumbnailUrls =
     video.thumbnailId
       ? await getThumbnailUrls([
@@ -453,6 +552,11 @@ export async function getVideoById(
     video.categoryId
       ? categoryNames.get(
           video.categoryId,
+        ) ?? null
+      : null,
+    video.videoCategoryId
+      ? videoCategoryNames.get(
+          video.videoCategoryId,
         ) ?? null
       : null,
     video.thumbnailId
@@ -490,6 +594,19 @@ export async function getVideoBySlug(
           string
         >();
 
+  const videoCategoryNames =
+    video.videoCategoryId
+      ? await getVideoCategoryNames(
+          [video.videoCategoryId],
+          toVideoLanguage(
+            video.language,
+          ),
+        )
+      : new Map<
+          string,
+          string
+        >();
+
   const thumbnailUrls =
     video.thumbnailId
       ? await getThumbnailUrls([
@@ -505,6 +622,11 @@ export async function getVideoBySlug(
     video.categoryId
       ? categoryNames.get(
           video.categoryId,
+        ) ?? null
+      : null,
+    video.videoCategoryId
+      ? videoCategoryNames.get(
+          video.videoCategoryId,
         ) ?? null
       : null,
     video.thumbnailId
@@ -579,6 +701,9 @@ export async function createVideo(
         categoryId:
           input.categoryId || null,
 
+        videoCategoryId:
+          input.videoCategoryId || null,
+
         thumbnailId:
           input.thumbnailId || null,
 
@@ -631,6 +756,7 @@ export async function updateVideo(
     language?: Language;
     status?: VideoStatus;
     categoryId?: string | null;
+    videoCategoryId?: string | null;
     thumbnailId?: string | null;
     videoUrl?: string;
     duration?: number | null;
@@ -696,6 +822,14 @@ export async function updateVideo(
   ) {
     data.categoryId =
       input.categoryId || null;
+  }
+
+  if (
+    input.videoCategoryId !==
+    undefined
+  ) {
+    data.videoCategoryId =
+      input.videoCategoryId || null;
   }
 
   if (
@@ -806,6 +940,7 @@ export async function deleteVideo(
       video,
       null,
       null,
+      null,
     ),
   };
 }
@@ -871,7 +1006,7 @@ export async function getVideoCategories(
   language: VideoLanguageValue = "EN",
 ) {
   const categories =
-    await prisma.category.findMany({
+    await prisma.videoCategory.findMany({
       select: {
         id: true,
         slug: true,
@@ -882,9 +1017,9 @@ export async function getVideoCategories(
     });
 
   const translations =
-    await prisma.categoryTranslation.findMany({
+    await prisma.videoCategoryTranslation.findMany({
       where: {
-        categoryId: {
+        videoCategoryId: {
           in: categories.map(
             (category) =>
               category.id,
@@ -894,7 +1029,7 @@ export async function getVideoCategories(
           language as Language,
       },
       select: {
-        categoryId: true,
+        videoCategoryId: true,
         name: true,
       },
     });
@@ -903,7 +1038,7 @@ export async function getVideoCategories(
     new Map(
       translations.map(
         (translation) => [
-          translation.categoryId,
+          translation.videoCategoryId,
           translation.name,
         ],
       ),

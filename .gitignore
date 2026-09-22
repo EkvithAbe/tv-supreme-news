@@ -20,4 +20,5 @@ out/
 # AI / editor generated files
 .agents/
 .claude/
-.windsurf/
+.windsurf/public/uploads/media/*.mov
+public/uploads/media/*.mov

@@ -236,12 +236,18 @@ export default function SettingsPage() {
        * an event for an already-mounted public ThemeProvider.
        */
       if (typeof window !== "undefined") {
-        localStorage.removeItem("tv-supreme-theme");
+        localStorage.removeItem("tv-supreme-user-theme");
 
         localStorage.setItem(
           "tv-supreme-public-theme-mode",
           data.settings.theme
         );
+
+        if (data.settings.theme === "Dark") {
+          localStorage.setItem("tv-supreme-admin-theme", "dark");
+        } else if (data.settings.theme === "Light") {
+          localStorage.setItem("tv-supreme-admin-theme", "light");
+        }
 
         window.dispatchEvent(
           new CustomEvent(
@@ -699,7 +705,7 @@ export default function SettingsPage() {
                 </p>
 
                 <p className="mb-3 text-xs leading-5 text-slate-400">
-                  This controls the public TV SUPREME website. The Admin CMS stays in light mode.
+                  Controls the default appearance for the public site and Admin CMS.
                   Save Settings to apply the new default.
                 </p>
 

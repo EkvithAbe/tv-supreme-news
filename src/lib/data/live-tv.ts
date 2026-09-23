@@ -93,6 +93,9 @@ async function getActiveOrLatestStream() {
   });
 }
 
+export const DEFAULT_LIVE_STREAM_URL =
+  "https://player.castr.com/live_3b18e370d0f011efa5904f4336ecbf7e";
+
 export async function getLiveTVSettings(): Promise<LiveTVSettings | null> {
   const [stream, settings] = await Promise.all([
     getActiveOrLatestStream(),
@@ -100,13 +103,36 @@ export async function getLiveTVSettings(): Promise<LiveTVSettings | null> {
   ]);
 
   if (!stream) {
-    return null;
+    return {
+      id: "default-stream",
+      channelName: "TV SUPREME",
+      streamUrl: DEFAULT_LIVE_STREAM_URL,
+      streamType: "EMBED",
+      isLive: true,
+      isEnabled: true,
+      playerTitle:
+        settings.get(SETTING_KEYS.PLAYER_TITLE) ??
+        "TV SUPREME Live",
+      fallbackUrl:
+        settings.get(SETTING_KEYS.FALLBACK_URL) ??
+        "",
+      autoPlay: parseBoolean(
+        settings.get(SETTING_KEYS.AUTOPLAY) ?? null,
+        true,
+      ),
+      showChat: parseBoolean(
+        settings.get(SETTING_KEYS.SHOW_CHAT) ?? null,
+        false,
+      ),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
   }
 
   return {
     id: stream.id,
     channelName: stream.channelName,
-    streamUrl: stream.streamUrl,
+    streamUrl: stream.streamUrl || DEFAULT_LIVE_STREAM_URL,
     streamType: mapStreamType(stream.streamType),
     isLive: stream.isLive,
     isEnabled: stream.isEnabled,

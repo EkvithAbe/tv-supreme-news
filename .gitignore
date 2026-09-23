@@ -20,5 +20,12 @@ out/
 # AI / editor generated files
 .agents/
 .claude/
-.windsurf/public/uploads/media/*.mov
-public/uploads/media/*.mov
+.windsurf/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Handover archives
+*.zip
+*.tar.gz

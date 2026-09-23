@@ -389,16 +389,9 @@ export default function Footer() {
          */
         const response =
           await fetch(
-            `/api/public/footer?language=${language}&_=${Date.now()}`,
+            `/api/public/footer?language=${language}`,
             {
               method: "GET",
-              cache: "no-store",
-
-              headers: {
-                "Cache-Control":
-                  "no-cache",
-              },
-
               signal:
                 controller.signal,
             },
@@ -806,7 +799,8 @@ export default function Footer() {
                       className="
                         flex
                         items-center
-                        gap-4
+                        gap-2.5
+                        sm:gap-4
                       "
                     >
                       <a
@@ -822,12 +816,12 @@ export default function Footer() {
                             : undefined
                         }
                         className="
-                          whitespace-nowrap
-                          text-[15px]
+                          text-[14px]
                           font-semibold
                           text-slate-600
                           transition
                           hover:text-[#ec008c]
+                          sm:whitespace-nowrap
                           sm:text-[16px]
                           dark:text-slate-300
                           dark:hover:text-[#ec008c]
@@ -841,9 +835,11 @@ export default function Footer() {
                         <span
                           aria-hidden="true"
                           className="
+                            hidden
                             text-[16px]
                             font-medium
                             text-slate-300
+                            sm:inline
                             dark:text-slate-600
                           "
                         >

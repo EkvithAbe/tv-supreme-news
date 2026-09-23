@@ -2,9 +2,12 @@ import "server-only";
 
 import {
   randomBytes,
-  scryptSync,
+  scrypt,
   timingSafeEqual,
 } from "node:crypto";
+import { promisify } from "node:util";
+
+const scryptAsync = promisify(scrypt);
 
 import { prisma } from "@/lib/prisma";
 import {
@@ -55,48 +58,34 @@ function normalizeName(
 }
 
 /**
- * Hash a password with Node.js scrypt.
+ * Hash a password with Node.js scrypt asynchronously.
  *
  * Format:
  * scrypt:salt:hash
  */
-export function hashPassword(
+export async function hashPassword(
   password: string,
-): string {
+): Promise<string> {
   const salt =
     randomBytes(16).toString("hex");
 
-  const hash = scryptSync(
+  const hash = (await scryptAsync(
     password,
     salt,
     64,
-  ).toString("hex");
+  )) as Buffer;
 
-  return `scrypt:${salt}:${hash}`;
-}
-
-/**
- * Hash used for a password comparison.
- */
-function hashPasswordWithSalt(
-  password: string,
-  salt: string,
-): string {
-  return scryptSync(
-    password,
-    salt,
-    64,
-  ).toString("hex");
+  return `scrypt:${salt}:${hash.toString("hex")}`;
 }
 
 /**
  * Verify a plain password against
- * the stored scrypt value.
+ * the stored scrypt value asynchronously.
  */
-export function verifyPassword(
+export async function verifyPassword(
   password: string,
   storedHash: string,
-): boolean {
+): Promise<boolean> {
   const parts =
     storedHash.split(":");
 
@@ -111,13 +100,11 @@ export function verifyPassword(
   const expectedHash = parts[2];
 
   try {
-    const actualHash = Buffer.from(
-      hashPasswordWithSalt(
-        password,
-        salt,
-      ),
-      "hex",
-    );
+    const actualHash = (await scryptAsync(
+      password,
+      salt,
+      64,
+    )) as Buffer;
 
     const expected = Buffer.from(
       expectedHash,
@@ -337,7 +324,7 @@ export async function createUser(
   }
 
   const passwordHash =
-    hashPassword(password);
+    await hashPassword(password);
 
   const user =
     await prisma.user.create({
@@ -477,7 +464,7 @@ export async function updateUser(
     }
 
     data.passwordHash =
-      hashPassword(
+      await hashPassword(
         input.password,
       );
   }

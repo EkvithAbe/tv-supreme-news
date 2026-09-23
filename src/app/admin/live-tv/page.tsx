@@ -46,9 +46,9 @@ const defaultSettings: Omit<
   "id" | "createdAt" | "updatedAt"
 > = {
   channelName: "TV SUPREME",
-  streamUrl: "",
-  streamType: "HLS",
-  isLive: false,
+  streamUrl: "https://player.castr.com/live_3b18e370d0f011efa5904f4336ecbf7e",
+  streamType: "Embed",
+  isLive: true,
   isEnabled: true,
   playerTitle: "TV SUPREME Live",
   fallbackUrl: "",

@@ -12,12 +12,15 @@ import {
   MessageCircle,
   Share2,
   Tag,
+  Video,
 } from "lucide-react";
 
 import {
   getArticleBySlug,
   getArticles,
 } from "@/lib/data/articles";
+
+export const revalidate = 60;
 
 type NewsPageProps = {
   params: Promise<{
@@ -271,6 +274,14 @@ export default async function NewsArticlePage({
     article.mainImage?.altText ??
     article.title;
 
+  const videoMedia = (article.media || []).filter(
+    (item) => item.type === "VIDEO",
+  );
+
+  const galleryImages = (article.media || []).filter(
+    (item) => item.type === "IMAGE" && item.id !== article.mainImageId,
+  );
+
   /*
    * Build popular topics dynamically from
    * database tags instead of a hardcoded list.
@@ -372,6 +383,13 @@ export default async function NewsArticlePage({
                 <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500">
                   News
                 </span>
+
+                {videoMedia.length > 0 && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-red-600 to-pink-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm">
+                    <Video size={13} />
+                    Video Report Included
+                  </span>
+                )}
               </div>
 
               {/* Title */}
@@ -486,6 +504,90 @@ export default async function NewsArticlePage({
                     ),
                   )}
                 </div>
+
+                {/* Video Report Player */}
+                {videoMedia.length > 0 && (
+                  <div className="mt-10 overflow-hidden rounded-[24px] border border-slate-200 bg-black shadow-lg dark:border-[#30374e]">
+                    <div className="flex items-center gap-2 border-b border-white/10 px-5 py-3 text-xs font-bold uppercase tracking-wider text-pink-400">
+                      <Video size={15} />
+                      Watch News Video Report
+                    </div>
+                    {videoMedia.map((video) => {
+                      const isEmbed =
+                        /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be|player\.vimeo\.com|vimeo\.com|player\.castr\.com)/i.test(
+                          video.url,
+                        );
+                      let embedUrl = video.url;
+                      if (video.url.includes("youtube.com/watch?v=")) {
+                        embedUrl = video.url.replace("watch?v=", "embed/");
+                      } else if (video.url.includes("youtu.be/")) {
+                        embedUrl = video.url.replace(
+                          "youtu.be/",
+                          "www.youtube.com/embed/",
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={video.id}
+                          className="relative aspect-video w-full bg-black"
+                        >
+                          {isEmbed ? (
+                            <iframe
+                              src={embedUrl}
+                              title={video.altText || article.title}
+                              className="h-full w-full border-0"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                            />
+                          ) : (
+                            <video
+                              controls
+                              playsInline
+                              preload="metadata"
+                              poster={imageUrl}
+                              className="h-full w-full"
+                            >
+                              <source src={video.url} />
+                              Your browser does not support HTML5 video.
+                            </video>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Additional Story Photos */}
+                {galleryImages.length > 0 && (
+                  <div className="mt-10 border-t border-slate-100 pt-8 dark:border-[#30374e]">
+                    <h3 className="mb-4 text-lg font-bold text-[#111d4a] dark:text-white">
+                      Story Gallery ({galleryImages.length}{" "}
+                      {galleryImages.length === 1 ? "photo" : "photos"})
+                    </h3>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {galleryImages.map((img) => (
+                        <div
+                          key={img.id}
+                          className="group overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 dark:border-[#30374e] dark:bg-[#151a2d]"
+                        >
+                          <div className="relative aspect-[16/10] w-full overflow-hidden">
+                            <img
+                              src={img.url}
+                              alt={img.altText || article.title}
+                              className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                            />
+                          </div>
+                          {img.altText && (
+                            <p className="p-3 text-xs text-slate-500 dark:text-slate-400">
+                              {img.altText}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Tags */}

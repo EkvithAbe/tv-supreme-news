@@ -185,7 +185,7 @@ export default function HeroSlider({
 
   return (
     <article className="relative overflow-hidden rounded-xl bg-black shadow-sm">
-      <div className="relative aspect-[16/9] min-h-[330px] sm:min-h-[400px]">
+      <div className="relative aspect-[4/5] min-h-[460px] sm:aspect-[16/10] sm:min-h-[420px] md:aspect-[16/9] md:min-h-[460px] lg:min-h-[480px]">
         <Image
           key={currentStory.id}
           src={
@@ -202,53 +202,53 @@ export default function HeroSlider({
           className="object-cover transition-opacity duration-500"
         />
 
-        {/* Dark overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent" />
+        {/* Dark overlay with enhanced mobile contrast */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent sm:from-black/90 sm:via-black/35" />
 
         {/* Category */}
         {currentStory.category?.name && (
-          <span className="absolute left-4 top-4 rounded-md bg-gradient-to-r from-[#ec008c] to-[#6a1b9a] px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white">
+          <span className="absolute left-4 top-4 z-10 rounded-md bg-gradient-to-r from-[#ec008c] to-[#6a1b9a] px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white shadow-sm">
             {currentStory.category.name}
           </span>
         )}
 
-        {/* Previous button */}
+        {/* Previous button (hidden on small mobile screens to prevent text overlap) */}
         {totalSlides > 1 && (
           <button
             type="button"
             aria-label="Previous story"
             onClick={goToPrevious}
-            className="absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition hover:bg-black/75 focus:outline-none focus:ring-2 focus:ring-white/80"
+            className="absolute left-3 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition hover:bg-black/75 focus:outline-none focus:ring-2 focus:ring-white/80 sm:flex"
           >
             <ChevronLeft size={21} />
           </button>
         )}
 
-        {/* Next button */}
+        {/* Next button (hidden on small mobile screens to prevent text overlap) */}
         {totalSlides > 1 && (
           <button
             type="button"
             aria-label="Next story"
             onClick={goToNext}
-            className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition hover:bg-black/75 focus:outline-none focus:ring-2 focus:ring-white/80"
+            className="absolute right-3 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition hover:bg-black/75 focus:outline-none focus:ring-2 focus:ring-white/80 sm:flex"
           >
             <ChevronRight size={21} />
           </button>
         )}
 
         {/* Hero content */}
-        <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-6 lg:p-7">
-          <h1 className="max-w-4xl text-2xl font-extrabold leading-tight text-white sm:text-4xl lg:text-5xl">
+        <div className="absolute bottom-0 left-0 right-0 z-10 p-4 pb-9 sm:p-6 sm:pb-7 lg:p-7 lg:pb-8">
+          <h1 className="max-w-4xl text-xl font-extrabold leading-tight text-white line-clamp-3 sm:line-clamp-2 sm:text-3xl md:text-4xl lg:line-clamp-3 lg:text-5xl">
             {currentStory.title}
           </h1>
 
           {currentStory.summary && (
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/90 sm:text-base lg:text-lg">
+            <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-white/90 sm:mt-3 sm:line-clamp-3 sm:text-base lg:text-lg">
               {currentStory.summary}
             </p>
           )}
 
-          <div className="mt-4 flex flex-wrap items-center gap-4 text-sm font-medium text-white">
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-medium text-white sm:mt-4 sm:gap-4 sm:text-sm">
             <span>
               ◷{" "}
               {formatTime(
@@ -273,7 +273,7 @@ export default function HeroSlider({
 
         {/* Slider dots */}
         {totalSlides > 1 && (
-          <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2">
+          <div className="absolute bottom-2.5 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 sm:bottom-3 sm:gap-2">
             {validStories.map(
               (story, index) => {
                 const isActive =

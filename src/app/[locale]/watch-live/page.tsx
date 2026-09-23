@@ -13,7 +13,7 @@ import {
 
 import { getLiveTVSettings } from "@/lib/data/live-tv";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 15;
 
 interface WatchLivePageProps {
   params: Promise<{
@@ -91,6 +91,37 @@ function isHlsUrl(url: string) {
   );
 }
 
+function getAutoplayEmbedUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+
+    if (hostname.includes("player.castr.com")) {
+      parsed.searchParams.set("autoplay", "on");
+      parsed.searchParams.set("muted", "on");
+      return parsed.toString();
+    }
+
+    if (hostname.includes("youtube.com") || hostname.includes("youtube-nocookie.com")) {
+      parsed.searchParams.set("autoplay", "1");
+      parsed.searchParams.set("mute", "1");
+      return parsed.toString();
+    }
+
+    if (hostname.includes("player.vimeo.com")) {
+      parsed.searchParams.set("autoplay", "1");
+      parsed.searchParams.set("muted", "1");
+      return parsed.toString();
+    }
+
+    parsed.searchParams.set("autoplay", "1");
+    parsed.searchParams.set("muted", "1");
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 export default async function WatchLivePage({
   params,
 }: WatchLivePageProps) {
@@ -164,6 +195,11 @@ export default async function WatchLivePage({
     streamType === "HLS" &&
     isHlsUrl(playerUrl) &&
     !isHostedPlayer;
+
+  const autoplayPlayerUrl =
+    isHostedPlayer && autoPlay
+      ? getAutoplayEmbedUrl(playerUrl)
+      : playerUrl;
 
   return (
     <main className="min-h-screen bg-white">
@@ -298,7 +334,7 @@ export default async function WatchLivePage({
 
                     {isHostedPlayer ? (
                       <iframe
-                        src={playerUrl}
+                        src={autoplayPlayerUrl}
                         title={playerTitle}
                         className="absolute inset-0 h-full w-full border-0"
                         allow="autoplay; fullscreen; picture-in-picture; encrypted-media"

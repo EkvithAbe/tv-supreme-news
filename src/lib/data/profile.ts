@@ -202,7 +202,7 @@ export async function requestProfileCredentialChange(
     data: {
       userId,
       type: ProfileChangeRequestType.PASSWORD,
-      requestedPasswordHash: hashPassword(value),
+      requestedPasswordHash: await hashPassword(value),
     },
   });
 

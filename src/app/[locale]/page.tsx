@@ -7,13 +7,16 @@ import {
   ArrowRight,
   BarChart3,
   Clapperboard,
+  Clock,
   Cpu,
   Eye,
+  Flame,
   Globe2,
   Home,
   Landmark,
   Leaf,
   Play,
+  Radio,
   Trophy,
 } from "lucide-react";
 
@@ -23,6 +26,8 @@ import HeroSlider from "@/components/home/HeroSlider";
 import { prisma } from "@/lib/prisma";
 import LiveTVPlayer from "@/components/home/LiveTVPlayer";
 import { getLiveTVSettings } from "@/lib/data/live-tv";
+
+export const revalidate = 30;
 
 /* =========================================================
    TYPES
@@ -884,7 +889,10 @@ export default async function HomePage() {
               BREAKING NEWS
           ================================================== */}
 
-          <section className="min-w-0 overflow-hidden rounded-xl border border-fuchsia-200 bg-white shadow-sm">
+          <section className="group/card relative flex min-w-0 flex-col justify-between overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition-all duration-300 hover:shadow-md dark:border-slate-800/80 dark:bg-[#12162a]">
+            {/* Top gradient accent line */}
+            <div className="h-1 w-full bg-gradient-to-r from-[#ec008c] via-[#b516b2] to-[#5f19c8]" />
+
             {(() => {
               const breakingNews = articles
                 .filter(
@@ -903,38 +911,41 @@ export default async function HomePage() {
                 return (
                   <>
                     {/* Header */}
-
-                    <div className="bg-gradient-to-r from-[#ec008c] to-[#5f19c8] px-4 py-3">
-                      <div className="flex items-center gap-2 text-white">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15 text-sm font-black">
-                          !
-                        </span>
-
-                        <h3 className="text-sm font-extrabold uppercase tracking-wide">
-                          Breaking News
-                        </h3>
+                    <div className="border-b border-slate-100 bg-gradient-to-b from-rose-50/40 via-white to-white px-4 py-3.5 dark:border-slate-800/80 dark:from-slate-900/60 dark:via-[#12162a] dark:to-[#12162a]">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-[#ec008c] to-[#5f19c8] text-white shadow-md shadow-pink-500/20">
+                          <Radio size={15} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#ec008c] dark:text-pink-400">
+                            Live Update
+                          </p>
+                          <h3 className="text-sm font-extrabold tracking-tight text-slate-900 dark:text-white">
+                            Breaking News
+                          </h3>
+                        </div>
                       </div>
                     </div>
 
                     <div className="flex min-h-[350px] flex-col items-center justify-center px-6 py-10 text-center">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-fuchsia-50 text-2xl font-black text-[#ec008c]">
-                        !
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-pink-50 text-[#ec008c] ring-1 ring-pink-100 dark:bg-pink-950/40 dark:ring-pink-900/40">
+                        <Radio size={20} className="text-[#ec008c]" />
                       </div>
 
-                      <p className="mt-4 text-sm font-bold text-slate-600">
-                        No breaking news
+                      <p className="mt-4 text-sm font-bold text-slate-700 dark:text-slate-200">
+                        No active breaking news
                       </p>
 
-                      <p className="mt-1 max-w-xs text-xs leading-5 text-slate-400">
-                        Breaking stories published from the CMS will appear here.
+                      <p className="mt-1 max-w-xs text-xs leading-relaxed text-slate-400 dark:text-slate-400">
+                        Urgent breaking stories and live dispatches published from the CMS will appear here.
                       </p>
 
                       <Link
                         href="/latest"
-                        className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-[#5f19c8] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#3c2372]"
+                        className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#ec008c] to-[#5f19c8] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:shadow-md hover:brightness-110"
                       >
                         View Latest News
-                        <ArrowRight size={14} />
+                        <ArrowRight size={13} />
                       </Link>
                     </div>
                   </>
@@ -946,29 +957,31 @@ export default async function HomePage() {
                   {/* =================================================
                       HEADER
                   ================================================== */}
-
-                  <div className="relative overflow-hidden bg-gradient-to-r from-[#ec008c] via-[#b516b2] to-[#5f19c8] px-4 py-3.5">
-                    <div className="absolute -right-8 -top-10 h-24 w-24 rounded-full bg-white/10 blur-2xl" />
-
-                    <div className="relative flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2.5 text-white">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-sm font-black ring-1 ring-white/15">
-                          !
-                        </span>
-
+                  <div className="border-b border-slate-100 bg-gradient-to-b from-rose-50/50 via-white to-white px-4 py-3.5 dark:border-slate-800/80 dark:from-slate-900/60 dark:via-[#12162a] dark:to-[#12162a]">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-[#ec008c] to-[#5f19c8] text-white shadow-md shadow-pink-500/20">
+                          <Radio size={15} />
+                        </div>
                         <div>
-                          <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/70">
+                          <p className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.2em] text-[#ec008c] dark:text-pink-400">
+                            <span className="relative flex h-1.5 w-1.5">
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
+                              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#ec008c]" />
+                            </span>
                             Live Update
                           </p>
-
-                          <h3 className="text-sm font-extrabold uppercase tracking-wide">
+                          <h3 className="text-sm font-extrabold uppercase tracking-wide text-slate-900 dark:text-white">
                             Breaking News
                           </h3>
                         </div>
                       </div>
 
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide text-white ring-1 ring-white/15">
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-[#ec008c] dark:border-pink-500/30 dark:bg-pink-500/15 dark:text-pink-300">
+                        <span className="relative flex h-2 w-2">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
+                          <span className="relative inline-flex h-2 w-2 rounded-full bg-[#ec008c]" />
+                        </span>
                         Live
                       </span>
                     </div>
@@ -977,75 +990,75 @@ export default async function HomePage() {
                   {/* =================================================
                       LEAD BREAKING STORY
                   ================================================== */}
-
                   <Link
                     href={`/news/${leadBreaking.slug}`}
-                    className="group block"
+                    className="group/lead block"
                   >
-                    <div className="relative aspect-[16/9] overflow-hidden bg-slate-900">
-                      <Image
-                        src={
-                          leadBreaking.mainImage?.url ??
-                          "/images/home/hero.jpg"
-                        }
-                        alt={
-                          leadBreaking.mainImage?.altText ??
-                          leadBreaking.title
-                        }
-                        fill
-                        sizes="(max-width: 1024px) 100vw, 30vw"
-                        className="object-cover transition duration-700 group-hover:scale-[1.04]"
-                      />
+                    <div className="p-3">
+                      <div className="relative aspect-[16/10] overflow-hidden rounded-xl bg-slate-900 shadow-sm">
+                        <Image
+                          src={
+                            leadBreaking.mainImage?.url ??
+                            "/images/home/hero.jpg"
+                          }
+                          alt={
+                            leadBreaking.mainImage?.altText ??
+                            leadBreaking.title
+                          }
+                          fill
+                          sizes="(max-width: 1024px) 100vw, 30vw"
+                          className="object-cover transition-transform duration-700 ease-out group-hover/lead:scale-105"
+                        />
 
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#11152b] via-black/25 to-black/5" />
+                        {/* Multi-layered cinematic gradient */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 via-55% to-black/10" />
 
-                      <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-[#ec008c] px-2.5 py-1.5 text-[9px] font-extrabold uppercase tracking-wide text-white shadow-lg">
-                        <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                        Breaking
-                      </span>
-
-                      <div className="absolute inset-x-0 bottom-0 p-4">
-                        <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wide text-pink-200">
-                          {leadBreaking.category?.name ??
-                            "TV SUPREME"}
-                        </p>
-
-                        <h4 className="line-clamp-3 text-base font-extrabold leading-5 text-white transition group-hover:text-pink-100">
-                          {leadBreaking.title}
-                        </h4>
-
-                        <div className="mt-3 flex items-center gap-3 text-[10px] text-white/70">
-                          <span>
-                            {formatTime(
-                              leadBreaking.publishedAt,
-                            )}
+                        {/* Badges on image */}
+                        <div className="absolute inset-x-3 top-3 flex items-center justify-between gap-2">
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#ec008c]/95 px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-white shadow-lg shadow-pink-950/30 backdrop-blur-md">
+                            <Flame size={11} className="fill-current text-white" />
+                            Breaking
                           </span>
 
-                          <span>•</span>
+                          {leadBreaking.category?.name && (
+                            <span className="rounded-md border border-white/20 bg-black/40 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white/90 backdrop-blur-md">
+                              {leadBreaking.category.name}
+                            </span>
+                          )}
+                        </div>
 
-                          <span className="inline-flex items-center gap-1">
-                            <Eye size={11} />
-                            {leadBreaking.views.toLocaleString()}
-                            {" views"}
-                          </span>
+                        {/* Headline & Meta overlay */}
+                        <div className="absolute inset-x-0 bottom-0 p-3.5">
+                          <h4 className="line-clamp-2 text-sm font-extrabold leading-snug text-white drop-shadow-sm transition-colors duration-200 group-hover/lead:text-pink-200 sm:text-base">
+                            {leadBreaking.title}
+                          </h4>
+
+                          <div className="mt-2.5 flex items-center gap-3 text-[10px] font-medium text-white/75">
+                            <span className="flex items-center gap-1">
+                              <Clock size={11} className="text-white/60" />
+                              {formatTime(leadBreaking.publishedAt)}
+                            </span>
+                            <span>•</span>
+                            <span className="inline-flex items-center gap-1">
+                              <Eye size={11} className="text-white/60" />
+                              {leadBreaking.views.toLocaleString()} views
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* =================================================
-                        DESCRIPTION
-                    ================================================== */}
-
-                    <div className="px-4 pb-4 pt-3.5">
+                    {/* Excerpt and CTA */}
+                    <div className="px-4 pb-3.5 pt-0.5">
                       {leadBreaking.summary && (
-                        <p className="line-clamp-3 text-xs leading-5 text-slate-500">
+                        <p className="line-clamp-2 text-xs leading-relaxed text-slate-500 dark:text-slate-300">
                           {leadBreaking.summary}
                         </p>
                       )}
 
-                      <div className="mt-3 inline-flex items-center gap-1 text-[11px] font-bold text-[#5f19c8] transition group-hover:text-[#ec008c]">
-                        Read full story
-                        <ArrowRight size={13} />
+                      <div className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-bold text-[#ec008c] transition-colors duration-200 group-hover/lead:text-[#5f19c8] dark:text-pink-400 dark:group-hover:text-pink-300">
+                        <span>Read full story</span>
+                        <ArrowRight size={13} className="transition-transform duration-200 group-hover/lead:translate-x-1" />
                       </div>
                     </div>
                   </Link>
@@ -1053,72 +1066,66 @@ export default async function HomePage() {
                   {/* =================================================
                       ADDITIONAL BREAKING STORIES
                   ================================================== */}
-
                   {moreBreaking.length > 0 && (
-                    <div className="border-t border-slate-100">
-                      {moreBreaking.map(
-                        (article) => (
-                          <Link
-                            key={article.id}
-                            href={`/news/${article.slug}`}
-                            className="group flex gap-3 border-b border-slate-100 px-4 py-3 transition last:border-b-0 hover:bg-fuchsia-50"
-                          >
-                            <div className="relative h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-100">
-                              <Image
-                                src={
-                                  article.mainImage?.url ??
-                                  "/images/home/hero.jpg"
-                                }
-                                alt={
-                                  article.mainImage?.altText ??
-                                  article.title
-                                }
-                                fill
-                                sizes="80px"
-                                className="object-cover transition duration-500 group-hover:scale-105"
-                              />
+                    <div className="divide-y divide-slate-100 border-t border-slate-100 dark:divide-slate-800/70 dark:border-slate-800/80">
+                      {moreBreaking.map((article) => (
+                        <Link
+                          key={article.id}
+                          href={`/news/${article.slug}`}
+                          className="group/item flex items-center gap-3 px-4 py-3 transition-colors duration-200 hover:bg-slate-50/80 dark:hover:bg-white/[0.03]"
+                        >
+                          <div className="relative h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-900 ring-1 ring-black/5 dark:ring-white/10">
+                            <Image
+                              src={
+                                article.mainImage?.url ??
+                                "/images/home/hero.jpg"
+                              }
+                              alt={
+                                article.mainImage?.altText ??
+                                article.title
+                              }
+                              fill
+                              sizes="80px"
+                              className="object-cover transition-transform duration-500 group-hover/item:scale-105"
+                            />
+                            <span className="absolute bottom-1 left-1 flex items-center gap-1 rounded bg-[#ec008c]/90 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white shadow backdrop-blur-xs">
+                              <span className="h-1 w-1 rounded-full bg-white animate-pulse" />
+                              Live
+                            </span>
+                          </div>
 
-                              <span className="absolute bottom-1 left-1 rounded bg-[#ec008c] px-1.5 py-0.5 text-[8px] font-bold uppercase text-white">
-                                Live
+                          <div className="min-w-0 flex-1">
+                            <h5 className="line-clamp-2 text-xs font-bold leading-snug text-slate-800 transition-colors duration-200 group-hover/item:text-[#ec008c] dark:text-slate-200 dark:group-hover:text-pink-400">
+                              {article.title}
+                            </h5>
+
+                            <div className="mt-1.5 flex items-center gap-2 text-[10px] text-slate-400 dark:text-slate-400">
+                              <span>{formatTime(article.publishedAt)}</span>
+                              <span>•</span>
+                              <span className="inline-flex items-center gap-1">
+                                <Eye size={10} />
+                                {article.views.toLocaleString()}
                               </span>
                             </div>
-
-                            <div className="min-w-0">
-                              <h5 className="line-clamp-2 text-xs font-bold leading-5 text-[#111d4a] transition group-hover:text-[#5f19c8]">
-                                {article.title}
-                              </h5>
-
-                              <div className="mt-1.5 flex items-center gap-2 text-[10px] text-slate-400">
-                                <span>
-                                  {formatTime(
-                                    article.publishedAt,
-                                  )}
-                                </span>
-
-                                <span>•</span>
-
-                                <span className="inline-flex items-center gap-1">
-                                  <Eye size={10} />
-                                  {article.views.toLocaleString()}
-                                </span>
-                              </div>
-                            </div>
-                          </Link>
-                        ),
-                      )}
+                          </div>
+                        </Link>
+                      ))}
                     </div>
                   )}
 
                   {/* =================================================
-                      VIEW ALL
+                      VIEW ALL FOOTER
                   ================================================== */}
-
                   <Link
                     href="/breaking-news"
-                    className="flex items-center justify-center gap-1 border-t border-slate-100 bg-slate-50 px-4 py-3 text-xs font-bold text-[#5f19c8] transition hover:bg-fuchsia-50 hover:text-[#ec008c]"
+                    className="group/all flex items-center justify-between border-t border-slate-100 bg-slate-50/70 px-4 py-3 transition-all duration-200 hover:bg-pink-50/50 dark:border-slate-800/80 dark:bg-slate-900/40 dark:hover:bg-pink-950/20"
                   >
-                    View All Breaking News
-                    <ArrowRight size={14} />
+                    <span className="text-xs font-bold text-slate-700 transition-colors duration-200 group-hover/all:text-[#ec008c] dark:text-slate-300 dark:group-hover:text-pink-300">
+                      View All Breaking News
+                    </span>
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-slate-500 shadow-xs ring-1 ring-slate-200/70 transition-all duration-200 group-hover/all:bg-[#ec008c] group-hover/all:text-white group-hover/all:ring-[#ec008c] group-hover/all:translate-x-0.5 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700">
+                      <ArrowRight size={12} />
+                    </span>
                   </Link>
                 </>
               );

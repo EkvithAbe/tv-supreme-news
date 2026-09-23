@@ -46,18 +46,25 @@ export async function GET() {
       rows.map((row) => [row.key, row.value])
     );
 
-    return NextResponse.json({
-      success: true,
-      settings: {
-        theme: parseTheme(values.get(keys.theme)),
-        primaryColor:
-          values.get(keys.primaryColor) ||
-          defaults.primaryColor,
-        logoUrl:
-          values.get(keys.logoUrl) ||
-          defaults.logoUrl,
+    return NextResponse.json(
+      {
+        success: true,
+        settings: {
+          theme: parseTheme(values.get(keys.theme)),
+          primaryColor:
+            values.get(keys.primaryColor) ||
+            defaults.primaryColor,
+          logoUrl:
+            values.get(keys.logoUrl) ||
+            defaults.logoUrl,
+        },
       },
-    });
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+        },
+      }
+    );
   } catch (error) {
     console.error(
       "GET /api/public/settings failed:",

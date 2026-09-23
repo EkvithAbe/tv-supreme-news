@@ -95,7 +95,7 @@ body {
     color 0.25s ease;
 }
 
-/* Use script-capable system fonts when a Sinhala or Tamil page is active. */
+/* Use script-capable system fonts with relaxed line-height when a Sinhala or Tamil page is active. */
 html[lang="si"] body,
 [lang="si"] {
   font-family:
@@ -103,6 +103,8 @@ html[lang="si"] body,
     "Nirmala UI",
     "Iskoola Pota",
     sans-serif;
+  line-height: 1.75;
+  word-break: break-word;
 }
 
 html[lang="ta"] body,
@@ -112,6 +114,8 @@ html[lang="ta"] body,
     "Nirmala UI",
     Latha,
     sans-serif;
+  line-height: 1.75;
+  word-break: break-word;
 }
 
 a {

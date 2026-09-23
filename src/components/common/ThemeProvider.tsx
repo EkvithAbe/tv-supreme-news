@@ -195,11 +195,7 @@ export function ThemeProvider({
       try {
         const response =
           await fetch(
-            `/api/public/settings?_=${Date.now()}`,
-            {
-              method: "GET",
-              cache: "no-store",
-            }
+            "/api/public/settings",
           );
 
         if (!response.ok) {

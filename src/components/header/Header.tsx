@@ -962,6 +962,10 @@ export default function Header() {
           : ""
       }`;
 
+    if (typeof document !== "undefined") {
+      document.cookie = `NEXT_LOCALE=${nextLocale}; path=/; max-age=31536000; SameSite=Lax`;
+    }
+
     window.location.href =
       finalPath;
 

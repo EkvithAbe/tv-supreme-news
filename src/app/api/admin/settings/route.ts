@@ -608,12 +608,30 @@ export async function PUT(
         },
       });
 
-    return NextResponse.json({
+    const saved = buildSettings(rows);
+
+    const response = NextResponse.json({
       success: true,
-      settings: buildSettings(rows),
+      settings: saved,
       message:
         "Settings saved successfully.",
     });
+
+    const langLower = (saved.defaultLanguage || "").trim().toLowerCase();
+    const cookieLocale =
+      langLower === "sinhala" || langLower === "si"
+        ? "si"
+        : langLower === "tamil" || langLower === "ta"
+          ? "ta"
+          : "en";
+
+    response.cookies.set("NEXT_LOCALE", cookieLocale, {
+      path: "/",
+      maxAge: 31536000,
+      sameSite: "lax",
+    });
+
+    return response;
   } catch (error) {
     console.error(
       "PUT /api/admin/settings failed:",

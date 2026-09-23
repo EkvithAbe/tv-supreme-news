@@ -520,20 +520,40 @@ export default function MediaLibraryPage() {
     try {
       setError("");
 
-      const response = await fetch(
+      let response = await fetch(
         `/api/admin/media?id=${encodeURIComponent(id)}`,
         {
           method: "DELETE",
         },
       );
 
-      const data = await response.json();
+      let data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(
-          data.message ||
-            "Failed to delete media.",
-        );
+        if (data.isInUse) {
+          const forceConfirm = window.confirm(
+            `${data.message}\n\nDo you want to unlink and force delete this file anyway?`,
+          );
+
+          if (forceConfirm) {
+            response = await fetch(
+              `/api/admin/media?id=${encodeURIComponent(id)}&force=true`,
+              {
+                method: "DELETE",
+              },
+            );
+            data = await response.json();
+            if (!response.ok || !data.success) {
+              setError(data.message || data.error || "Failed to delete media.");
+              return;
+            }
+          } else {
+            return;
+          }
+        } else {
+          setError(data.message || data.error || "Failed to delete media.");
+          return;
+        }
       }
 
       setMedia((current) =>
@@ -547,11 +567,6 @@ export default function MediaLibraryPage() {
         setSelectedId(null);
       }
     } catch (deleteError) {
-      console.error(
-        "Delete failed:",
-        deleteError,
-      );
-
       setError(
         deleteError instanceof Error
           ? deleteError.message

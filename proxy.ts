@@ -46,6 +46,15 @@ export default function proxy(
     return NextResponse.redirect(loginUrl);
   }
 
+  /*
+   * Allow root path "/" to pass through to src/app/page.tsx so it can
+   * dynamically look up the administrator's default language in the database
+   * and redirect to the correct locale (/en, /si, /ta).
+   */
+  if (pathname === "/") {
+    return NextResponse.next();
+  }
+
   return intlProxy(request);
 }
 

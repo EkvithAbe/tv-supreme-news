@@ -38,6 +38,7 @@ type AdminShellProps = {
     id: string;
     name: string;
     role: "ADMIN" | "EDITOR";
+    image?: string | null;
   };
   children: React.ReactNode;
 };
@@ -119,6 +120,7 @@ export default function AdminShell({ user, children }: AdminShellProps) {
               user={{
                 name: user.name,
                 role: user.role,
+                image: user.image,
               }}
             />
 

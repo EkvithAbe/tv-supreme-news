@@ -9,6 +9,7 @@ export type AdminUser = {
   id: string;
   name: string;
   role: "ADMIN" | "EDITOR";
+  image?: string | null;
 };
 
 const AdminUserContext =

@@ -10,6 +10,7 @@ const keys = {
   theme: "site_theme",
   primaryColor: "primary_color",
   logoUrl: siteSettingKeys.logoUrl,
+  defaultLanguage: "default_language",
 } as const;
 
 type PublicThemeMode = "Light" | "Dark" | "System";
@@ -57,6 +58,8 @@ export async function GET() {
           logoUrl:
             values.get(keys.logoUrl) ||
             defaults.logoUrl,
+          defaultLanguage:
+            values.get(keys.defaultLanguage) || "English",
         },
       },
       {

@@ -16,6 +16,7 @@ export default async function AdminLayout({
         id: user.id,
         name: user.name,
         role: user.role,
+        image: user.profileImage?.url ?? null,
       }}
     >
       <AdminAccessGuard role={user.role}>
@@ -24,6 +25,7 @@ export default async function AdminLayout({
             id: user.id,
             name: user.name,
             role: user.role,
+            image: user.profileImage?.url ?? null,
           }}
         >
           {children}

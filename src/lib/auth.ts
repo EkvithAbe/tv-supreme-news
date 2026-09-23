@@ -26,6 +26,11 @@ export type AuthenticatedUser = {
   name: string;
   email: string;
   role: UserRole;
+  profileImage?: {
+    id: string;
+    url: string;
+    altText: string | null;
+  } | null;
 };
 
 type SessionDetails = {
@@ -179,6 +184,13 @@ export async function getCurrentUser(): Promise<
             name: true,
             email: true,
             role: true,
+            profileImage: {
+              select: {
+                id: true,
+                url: true,
+                altText: true,
+              },
+            },
           },
         },
       },

@@ -262,17 +262,19 @@ export default function AdminDashboard() {
           },
         );
 
-        const data: DashboardResponse =
+        const data: DashboardResponse & { error?: string } =
           await response.json();
 
         if (
           !response.ok ||
           !data.success
         ) {
-          throw new Error(
-            data.message ||
+          setError(
+            data.error ||
+              data.message ||
               "Failed to load dashboard.",
           );
+          return;
         }
 
         setStats(
@@ -303,11 +305,6 @@ export default function AdminDashboard() {
             0,
         );
       } catch (dashboardError) {
-        console.error(
-          "Failed to load dashboard:",
-          dashboardError,
-        );
-
         setError(
           dashboardError instanceof Error
             ? dashboardError.message

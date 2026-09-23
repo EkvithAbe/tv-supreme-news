@@ -185,7 +185,10 @@ export async function updateMedia(
   return mapMedia(media);
 }
 
-export async function deleteMedia(id: string) {
+export async function deleteMedia(
+  id: string,
+  options?: { force?: boolean }
+) {
   const media = await prisma.media.findUnique({
     where: {
       id,
@@ -224,16 +227,37 @@ export async function deleteMedia(id: string) {
     }),
   ]);
 
-  const isInUse =
-    mainArticleCount > 0 ||
-    articleMediaCount > 0 ||
-    videoThumbnailCount > 0 ||
-    homepageSectionCount > 0;
-
-  if (isInUse) {
-    throw new Error(
-      "This media file is currently being used and cannot be deleted."
+  const usageDetails: string[] = [];
+  if (mainArticleCount > 0) {
+    usageDetails.push(
+      `${mainArticleCount} article main image${mainArticleCount > 1 ? "s" : ""}`
     );
+  }
+  if (articleMediaCount > 0) {
+    usageDetails.push(
+      `${articleMediaCount} article gallery item${articleMediaCount > 1 ? "s" : ""}`
+    );
+  }
+  if (videoThumbnailCount > 0) {
+    usageDetails.push(
+      `${videoThumbnailCount} video thumbnail${videoThumbnailCount > 1 ? "s" : ""}`
+    );
+  }
+  if (homepageSectionCount > 0) {
+    usageDetails.push(
+      `${homepageSectionCount} homepage section${homepageSectionCount > 1 ? "s" : ""}`
+    );
+  }
+
+  const isInUse = usageDetails.length > 0;
+
+  if (isInUse && !options?.force) {
+    const error = new Error(
+      `This media file is currently in use (${usageDetails.join(", ")}).`
+    );
+    (error as Error & { isInUse?: boolean; usageDetails?: string[] }).isInUse = true;
+    (error as Error & { isInUse?: boolean; usageDetails?: string[] }).usageDetails = usageDetails;
+    throw error;
   }
 
   await prisma.media.delete({

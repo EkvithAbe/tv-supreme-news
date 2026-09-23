@@ -438,6 +438,7 @@ export async function DELETE(request: Request) {
     const { searchParams } = new URL(request.url);
 
     const id = searchParams.get("id");
+    const force = searchParams.get("force") === "true";
 
     if (!id) {
       return NextResponse.json(
@@ -451,7 +452,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const result = await deleteMedia(id);
+    const result = await deleteMedia(id, { force });
 
     /*
      * Delete the physical file only when it belongs
@@ -488,20 +489,25 @@ export async function DELETE(request: Request) {
       message: "Media deleted successfully.",
     });
   } catch (error) {
-    console.error(
-      "DELETE /api/admin/media error:",
-      error
-    );
-
     const message =
       error instanceof Error
         ? error.message
         : "Failed to delete media.";
 
+    const isInUse = Boolean(
+      error && typeof error === "object" && "isInUse" in error && error.isInUse
+    );
+    const usageDetails =
+      error && typeof error === "object" && "usageDetails" in error
+        ? (error.usageDetails as string[])
+        : undefined;
+
     return NextResponse.json(
       {
         success: false,
         message,
+        isInUse,
+        usageDetails,
       },
       {
         status: 400,

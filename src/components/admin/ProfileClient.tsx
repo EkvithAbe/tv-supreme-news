@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Check,
   Clock3,
@@ -98,6 +99,7 @@ export default function ProfileClient({
   initialProfile,
   initialPendingRequests,
 }: Props) {
+  const router = useRouter();
   const [profile, setProfile] = useState(initialProfile);
   const [name, setName] = useState(initialProfile.name);
   const [phone, setPhone] = useState(initialProfile.phone ?? "");
@@ -191,6 +193,7 @@ export default function ProfileClient({
       }));
       setPassword("");
       setSuccess("Profile saved.");
+      router.refresh();
     } catch (saveError) {
       setError(
         saveError instanceof Error

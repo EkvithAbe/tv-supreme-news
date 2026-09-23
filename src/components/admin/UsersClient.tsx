@@ -26,6 +26,11 @@ type CmsUser = {
   name: string;
   email: string;
   role: UserRole;
+  profileImage?: {
+    id: string;
+    url: string;
+    altText?: string | null;
+  } | null;
   createdAt: string | Date;
   updatedAt: string | Date;
   articleCount: number;
@@ -909,18 +914,26 @@ export default function UsersClient({
                           }
                           className="flex min-w-0 items-center gap-3 text-left"
                         >
-                          <div
-                            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${
-                              user.role ===
-                              "ADMIN"
-                                ? "bg-gradient-to-br from-pink-600 to-purple-600"
-                                : "bg-slate-700"
-                            }`}
-                          >
-                            {getInitials(
-                              user.name,
-                            )}
-                          </div>
+                          {user.profileImage?.url ? (
+                            <img
+                              src={user.profileImage.url}
+                              alt={user.name}
+                              className="h-11 w-11 shrink-0 rounded-full object-cover ring-2 ring-pink-500/20"
+                            />
+                          ) : (
+                            <div
+                              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${
+                                user.role ===
+                                "ADMIN"
+                                  ? "bg-gradient-to-br from-pink-600 to-purple-600"
+                                  : "bg-slate-700"
+                              }`}
+                            >
+                              {getInitials(
+                                user.name,
+                              )}
+                            </div>
+                          )}
 
                           <div className="min-w-0">
                             <p className="truncate text-sm font-semibold text-slate-800">
@@ -1163,18 +1176,26 @@ export default function UsersClient({
           <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div className="min-w-0">
               <div className="flex items-center gap-4">
-                <div
-                  className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-xl font-bold text-white ${
-                    selectedUser.role ===
-                    "ADMIN"
-                      ? "bg-gradient-to-br from-pink-600 to-purple-600"
-                      : "bg-slate-700"
-                  }`}
-                >
-                  {getInitials(
-                    selectedUser.name,
-                  )}
-                </div>
+                {selectedUser.profileImage?.url ? (
+                  <img
+                    src={selectedUser.profileImage.url}
+                    alt={selectedUser.name}
+                    className="h-16 w-16 shrink-0 rounded-full object-cover ring-2 ring-pink-500/30"
+                  />
+                ) : (
+                  <div
+                    className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-xl font-bold text-white ${
+                      selectedUser.role ===
+                      "ADMIN"
+                        ? "bg-gradient-to-br from-pink-600 to-purple-600"
+                        : "bg-slate-700"
+                    }`}
+                  >
+                    {getInitials(
+                      selectedUser.name,
+                    )}
+                  </div>
+                )}
 
                 <div className="min-w-0">
                   <h3 className="truncate text-xl font-bold text-slate-900">
